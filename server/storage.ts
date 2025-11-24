@@ -65,7 +65,7 @@ export class HybridStorage implements IStorage {
   }
 
   async getAllDocuments(): Promise<(Document & { analysis?: DocumentAnalysis })[]> {
-    if (!db) return [];
+    if (!firebaseDb) return [];
 
     const snapshot = await firebaseDb.collection(COLLECTIONS.DOCUMENTS)
       .orderBy("uploadedAt", "desc")
@@ -88,7 +88,7 @@ export class HybridStorage implements IStorage {
   }
 
   async createDocument(insertDoc: InsertDocument): Promise<Document> {
-    if (!db) throw new Error("Firestore not initialized");
+    if (!firebaseDb) throw new Error("Firestore not initialized");
 
     const id = nanoid();
     const document: Document = {
