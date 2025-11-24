@@ -1,0 +1,138 @@
+*Project Name: PaperMind AI — Research Assistant Platform**
+
+PaperMindAI is an intelligent research-paper analysis platform that allows users to upload academic documents (PDF, text, or scanned text), process them using AI, and generate:
+
+* 📌 Summary
+* 📌 Citation Extraction
+* 📌 Paraphrased Content
+* 📌 Plagiarism Score
+* 🎧 Text-to-Speech Audio Output
+* 📊 Dashboard With Reports and Download Options
+
+It’s designed like a **full ML-powered SaaS application** with multiple integrated modules.
+*System Architecture Overview**
+
+```
+Client (React + Vite) 
+          |
+          | REST API (HTTPS)
+          |
+Backend (Node.js + Express + TypeScript)
+          |
+          | Calls AI Engines
+          |
+     OpenAI API / NLP Models
+          |
+          | Processed Outputs
+          |
+Database: MongoDB Atlas (Stores files, transcripts, metadata)
+```
+
+Text-to-Speech audio can also be stored for caching.
+MODULE BREAKDOWN (With Technical Detail)
+
+
+
+### **🔥 MODULE 1: Upload & File Handling**
+
+**Purpose:** Allow users to upload research papers and convert them into readable text.
+
+🔹 Uses **React file input + FormData** on frontend
+🔹 Backend uses:
+
+* `Multer` → receives uploaded files
+* `PDF-parse` or `pdf-parse-extraction` → extract text from PDF
+
+
+  * filename
+  * extracted text
+  * timestamps
+  * processing metadata (UUID)
+  * user reference (future multi-user support)
+
+**Flow Example:**
+
+User uploads PDF → Multer saves temp file → PDF text extracted → 
+Text stored in MongoDB → Response returns documentId → 
+Frontend redirects to analysis dashboard
+MODULE 2: AI Processing Engine**
+
+This is the **core intelligence layer**.
+
+It contains multiple sub-processors that operate independently:
+
+| Feature              | Backend Logic          | AI Method                                |
+| -------------------- | ---------------------- | ---------------------------------------- |
+| Summary              | `/summarize` endpoint  | Prompt engineering → OpenAI GPT          |
+| Citation Extraction  | `/citations` endpoint  | Pattern recognition + GPT extraction     |
+| Paraphrasing         | `/paraphrase` endpoint | GPT rewrite with tone + structure prompt |
+| Plagiarism Detection | `/plagiarism` endpoint | Compare text + GPT scoring + heuristics  |
+
+**Architecture:**
+
+```
+Document Text → AI Processing Pipeline → JSON results stored in DB
+```
+
+Each function is modular so it can run individually or in sequence.
+
+
+### **🔊 MODULE 3: Text-to-Speech (TTS)**
+
+**Purpose:** Convert summaries (or any selected text) into human-like voice.
+
+🔹 Backend uses:
+```
+OpenAI API → gpt-4o-realtime or tts-1 model → Audio Base64 Buffer → 
+Converted to MP3 → Sent to frontend → Played in audio player
+
+MODULE 4: Dashboard, Reports & Download Center**
+
+This is the user-facing view after document processing.
+
+Features:
+
+✔ Displays extracted PDF text
+✔ Shows AI results: summary, citations, paraphrasing, plagiarism score
+✔ Interactive graph UI (donut chart for plagiarism score)
+✔ Export options for:
+
+* PDF report
+* MP3 audio
+* ZIP archive of all results
+
+When finalized, this module turns the tool into a **production-ready academic assistant**.
+Database Schema (Simplified)
+
+```ts
+Document {
+  _id: ObjectId,
+  filename: string,
+  uploadedAt: Date,
+  extractedText: string,
+  summary?: string,
+  citations?: string[],
+  paraphrase?: string,
+  plagiarismScore?: number,
+  ttsAudio?: string, // Base64 (optional)
+}
+Tech Stack Summary
+
+| Layer           | Technology                                                          |
+| --------------- | ------------------------------------------------------------------- |
+| Frontend        | React + Vite + Tailwind (future chart library: Recharts / Chart.js) |
+| Backend         | Node.js + Express + TypeScript                                      |
+| AI Engine       | OpenAI GPT (Text + TTS models)                                      |
+| File Processing | Multer + PDF Parsing                                                |
+| Database        | MongoDB Atlas                                                       |
+| Exporting       | (Planned) pdf-lib or Puppeteer for PDF reports                      |
+| Deployment      | Render / Vercel planned                                             |
+ADD THIS 
+| Save history                | Access past processed papers        |
+| AI Chat with Document       | Like ChatPDF                        |
+MULTI-LANGUAGE TOGGLE
+DARK MODE OR LIGHT MODE 
+Final Summary
+
+> Your project is a **full AI-powered research assistant platform** capable of taking academic documents, breaking them down with LLMs, analyzing content, detecting plagiarism, paraphrasing, extracting citations, and converting text to speech — all stored and displayed in a dashboard.  USE FIREBASE ONLY, DONT USE MONGO 
+develop complete web app accordingly
