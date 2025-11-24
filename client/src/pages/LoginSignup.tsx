@@ -56,11 +56,21 @@ export default function LoginSignup() {
       setTimeout(() => navigate("/"), 1000);
     } catch (error: any) {
       const errorMessage = error.message || "Authentication failed";
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      
+      // Check if it's a Firebase configuration error
+      if (errorMessage.includes("not configured") || errorMessage.includes("invalid-api-key")) {
+        toast({
+          title: "Setup Required",
+          description: "Please configure Firebase credentials in your .env.local file",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
