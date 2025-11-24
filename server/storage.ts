@@ -1,26 +1,55 @@
-import type { Document, DocumentAnalysis, InsertDocument } from "@shared/schema";
+import type { Document, DocumentAnalysis, InsertDocument, User, UpsertUser } from "@shared/schema";
+import { users } from "@shared/schema";
 import { nanoid } from "nanoid";
-import { db, COLLECTIONS } from "./firebase";
+import { db as firebaseDb, COLLECTIONS } from "./firebase";
+import { db as postgresDb } from "./db";
+import { eq } from "drizzle-orm";
 
 export interface IStorage {
-  // Document operations
+  // User operations (for Replit Auth - uses PostgreSQL)
+  getUser(id: string): Promise<User | undefined>;
+  upsertUser(user: UpsertUser): Promise<User>;
+  
+  // Document operations (uses Firebase Firestore)
   getDocument(id: string): Promise<(Document & { analysis?: DocumentAnalysis }) | undefined>;
   getAllDocuments(): Promise<(Document & { analysis?: DocumentAnalysis })[]>;
   createDocument(doc: InsertDocument): Promise<Document>;
   updateDocumentStatus(id: string, status: Document["status"]): Promise<void>;
   deleteDocument(id: string): Promise<void>;
   
-  // Analysis operations
+  // Analysis operations (uses Firebase Firestore)
   saveAnalysis(documentId: string, analysis: Partial<DocumentAnalysis>): Promise<void>;
   saveTTSAudio(documentId: string, audioUrl: string): Promise<void>;
 }
 
-// Firebase Firestore implementation
-export class FirestoreStorage implements IStorage {
-  async getDocument(id: string): Promise<(Document & { analysis?: DocumentAnalysis }) | undefined> {
-    if (!db) return undefined;
+// Hybrid storage implementation (PostgreSQL for users, Firebase for documents)
+export class HybridStorage implements IStorage {
+  // User operations (PostgreSQL)
+  async getUser(id: string): Promise<User | undefined> {
+    const [user] = await postgresDb.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
 
-    const docRef = db.collection(COLLECTIONS.DOCUMENTS).doc(id);
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const [user] = await postgresDb
+      .insert(users)
+      .values(userData)
+      .onConflictDoUpdate({
+        target: users.id,
+        set: {
+          ...userData,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return user;
+  }
+
+  // Document operations (Firebase Firestore)
+  async getDocument(id: string): Promise<(Document & { analysis?: DocumentAnalysis }) | undefined> {
+    if (!firebaseDb) return undefined;
+
+    const docRef = firebaseDb.collection(COLLECTIONS.DOCUMENTS).doc(id);
     const doc = await docRef.get();
     
     if (!doc.exists) return undefined;
@@ -28,7 +57,7 @@ export class FirestoreStorage implements IStorage {
     const docData = doc.data() as Document;
 
     // Get analysis if exists
-    const analysisRef = db.collection(COLLECTIONS.ANALYSES).doc(id);
+    const analysisRef = firebaseDb.collection(COLLECTIONS.ANALYSES).doc(id);
     const analysisDoc = await analysisRef.get();
     const analysis = analysisDoc.exists ? (analysisDoc.data() as DocumentAnalysis) : undefined;
 
@@ -38,7 +67,7 @@ export class FirestoreStorage implements IStorage {
   async getAllDocuments(): Promise<(Document & { analysis?: DocumentAnalysis })[]> {
     if (!db) return [];
 
-    const snapshot = await db.collection(COLLECTIONS.DOCUMENTS)
+    const snapshot = await firebaseDb.collection(COLLECTIONS.DOCUMENTS)
       .orderBy("uploadedAt", "desc")
       .get();
 
@@ -47,7 +76,7 @@ export class FirestoreStorage implements IStorage {
         const docData = doc.data() as Document;
         
         // Get analysis if exists
-        const analysisRef = db.collection(COLLECTIONS.ANALYSES).doc(doc.id);
+        const analysisRef = firebaseDb.collection(COLLECTIONS.ANALYSES).doc(doc.id);
         const analysisDoc = await analysisRef.get();
         const analysis = analysisDoc.exists ? (analysisDoc.data() as DocumentAnalysis) : undefined;
 
@@ -69,30 +98,30 @@ export class FirestoreStorage implements IStorage {
       status: "processing",
     };
 
-    await db.collection(COLLECTIONS.DOCUMENTS).doc(id).set(document);
+    await firebaseDb.collection(COLLECTIONS.DOCUMENTS).doc(id).set(document);
     return document;
   }
 
   async updateDocumentStatus(id: string, status: Document["status"]): Promise<void> {
     if (!db) return;
 
-    await db.collection(COLLECTIONS.DOCUMENTS).doc(id).update({ status });
+    await firebaseDb.collection(COLLECTIONS.DOCUMENTS).doc(id).update({ status });
   }
 
   async deleteDocument(id: string): Promise<void> {
     if (!db) return;
 
     // Delete document
-    await db.collection(COLLECTIONS.DOCUMENTS).doc(id).delete();
+    await firebaseDb.collection(COLLECTIONS.DOCUMENTS).doc(id).delete();
     
     // Delete analysis
-    await db.collection(COLLECTIONS.ANALYSES).doc(id).delete();
+    await firebaseDb.collection(COLLECTIONS.ANALYSES).doc(id).delete();
   }
 
   async saveAnalysis(documentId: string, analysis: Partial<DocumentAnalysis>): Promise<void> {
     if (!db) return;
 
-    const analysisRef = db.collection(COLLECTIONS.ANALYSES).doc(documentId);
+    const analysisRef = firebaseDb.collection(COLLECTIONS.ANALYSES).doc(documentId);
     const existing = await analysisRef.get();
 
     if (existing.exists) {
@@ -113,10 +142,31 @@ export class FirestoreStorage implements IStorage {
 export class MemStorage implements IStorage {
   private documents: Map<string, Document>;
   private analyses: Map<string, DocumentAnalysis>;
+  private usersMap: Map<string, User>;
 
   constructor() {
     this.documents = new Map();
     this.analyses = new Map();
+    this.usersMap = new Map();
+  }
+
+  // User operations (in-memory)
+  async getUser(id: string): Promise<User | undefined> {
+    return this.usersMap.get(id);
+  }
+
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const user: User = {
+      id: userData.id!,
+      email: userData.email || null,
+      firstName: userData.firstName || null,
+      lastName: userData.lastName || null,
+      profileImageUrl: userData.profileImageUrl || null,
+      createdAt: this.usersMap.get(userData.id!)?.createdAt || new Date(),
+      updatedAt: new Date(),
+    };
+    this.usersMap.set(user.id, user);
+    return user;
   }
 
   async getDocument(id: string): Promise<(Document & { analysis?: DocumentAnalysis }) | undefined> {
@@ -170,11 +220,13 @@ export class MemStorage implements IStorage {
   }
 }
 
-// Use Firestore if available, otherwise fallback to in-memory
-export const storage: IStorage = db ? new FirestoreStorage() : new MemStorage();
+// Use HybridStorage (PostgreSQL for users + Firebase for documents) or in-memory fallback
+export const storage: IStorage = firebaseDb ? new HybridStorage() : new MemStorage();
 
-if (!db) {
-  console.log("📝 Using in-memory storage (data will be lost on restart)");
-  console.log("💡 To enable persistence, set Firebase environment variables:");
+if (!firebaseDb) {
+  console.log("📝 Using in-memory storage for documents (data will be lost on restart)");
+  console.log("💡 To enable Firebase persistence, set environment variables:");
   console.log("   FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY");
 }
+
+console.log("✅ PostgreSQL enabled for user authentication and sessions");
