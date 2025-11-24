@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuthFirebase } from "@/hooks/useAuthFirebase";
+import { logout } from "@/lib/firebaseAuth";
 import { AppSidebar } from "@/components/AppSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LanguageSelector } from "@/components/LanguageSelector";
@@ -16,16 +17,27 @@ import Dashboard from "@/pages/Dashboard";
 import Upload from "@/pages/Upload";
 import History from "@/pages/History";
 import DocumentView from "@/pages/DocumentView";
-import Landing from "@/pages/Landing";
+import LoginSignup from "@/pages/LoginSignup";
 import NotFound from "@/pages/not-found";
 
 function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading } = useAuthFirebase();
+
+  if (isLoading) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+      </div>
+    );
+  }
 
   return (
     <Switch>
-      {isLoading || !isAuthenticated ? (
-        <Route path="/" component={Landing} />
+      {!isAuthenticated ? (
+        <>
+          <Route path="/" component={LoginSignup} />
+          <Route path="/login" component={LoginSignup} />
+        </>
       ) : (
         <>
           <Route path="/" component={Dashboard} />
@@ -60,15 +72,23 @@ export default function App() {
 }
 
 function AuthenticatedApp({ style }: { style: any }) {
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuthFirebase();
 
-  if (isLoading || !isAuthenticated) {
+  if (isLoading) {
     return (
-      <div className="h-screen w-full">
-        <Router />
+      <div className="h-screen w-full flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
       </div>
     );
   }
+
+  if (!isAuthenticated) {
+    return <Router />;
+  }
+
+  const handleLogout = async () => {
+    await logout();
+  };
 
   return (
     <SidebarProvider style={style as React.CSSProperties}>
@@ -79,25 +99,28 @@ function AuthenticatedApp({ style }: { style: any }) {
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
-                {user?.profileImageUrl && (
+                {user?.photoURL && (
                   <img 
-                    src={user.profileImageUrl} 
+                    src={user.photoURL} 
                     alt="Profile" 
                     className="h-8 w-8 rounded-full object-cover"
                     data-testid="img-user-profile"
                   />
                 )}
                 <span className="text-sm font-medium" data-testid="text-user-name">
-                  {user?.firstName || user?.email}
+                  {user?.displayName || user?.email}
                 </span>
               </div>
               <LanguageSelector />
               <ThemeToggle />
-              <a href="/api/logout">
-                <Button variant="ghost" size="icon" data-testid="button-logout">
-                  <LogOut className="h-5 w-5" />
-                </Button>
-              </a>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={handleLogout}
+                data-testid="button-logout"
+              >
+                <LogOut className="h-5 w-5" />
+              </Button>
             </div>
           </header>
           <main className="flex-1 overflow-auto p-8">

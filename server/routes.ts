@@ -3,7 +3,6 @@ import { createServer, type Server } from "http";
 import multer from "multer";
 import * as pdfParse from "pdf-parse";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
 import {
   insertDocumentSchema,
   analyzeDocumentSchema,
@@ -30,28 +29,13 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Setup authentication
-  await setupAuth(app);
-
   // Check for OpenAI API key
   if (!process.env.OPENAI_API_KEY) {
     console.error("❌ OPENAI_API_KEY is not set. AI features will not work.");
   }
 
-  // Auth route - get current user
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
-    }
-  });
-
-  // Upload PDF and extract text (protected route)
-  app.post("/api/upload", isAuthenticated, upload.single("file"), async (req, res) => {
+  // Upload PDF and extract text
+  app.post("/api/upload", upload.single("file"), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).send("No file uploaded");
