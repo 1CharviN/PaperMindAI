@@ -14,7 +14,7 @@ An intelligent, full-featured research paper analysis platform with Firebase Aut
 - **🎵 Text-to-Speech** - Listen to papers with OpenAI TTS
 - **📊 Document History** - Search, manage, and organize your research
 - **🌙 Dark Mode** - Full dark/light mode support
-- **🌍 Multi-Language** - English, Spanish, French, German, Chinese
+- **🌍 Multi-Language** - English, Hindi, Kannada, Telugu and Tamil
 - **📱 Responsive Design** - Works on desktop, tablet, and mobile
 
 ## 🚀 Quick Start
