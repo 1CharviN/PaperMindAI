@@ -7,26 +7,26 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useTranslation } from "react-i18next";
 
 const languages = [
-  { code: "en", name: "English", flag: "🇺🇸" },
-  { code: "es", name: "Español", flag: "🇪🇸" },
-  { code: "fr", name: "Français", flag: "🇫🇷" },
-  { code: "de", name: "Deutsch", flag: "🇩🇪" },
-  { code: "zh", name: "中文", flag: "🇨🇳" },
+  { code: "en", label: "English", flag: "🇮🇳" },
+  { code: "hi", label: "हिन्दी", flag: "🇮🇳" },
+  { code: "ta", label: "தமிழ்", flag: "🇮🇳" },
+  { code: "te", label: "తెలుగు", flag: "🇮🇳" },
+  { code: "kn", label: "ಕನ್ನಡ", flag: "🇮🇳" }
 ];
 
 export function LanguageSelector() {
+  const { t } = useTranslation();
   const { language, changeLanguage } = useLanguage();
-
-  const currentLang = languages.find((l) => l.code === language) || languages[0];
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" data-testid="button-language-selector">
           <Languages className="h-5 w-5" />
-          <span className="sr-only">Change language</span>
+          <span className="sr-only">{t("changeLanguage")}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
@@ -38,7 +38,7 @@ export function LanguageSelector() {
             data-testid={`language-option-${lang.code}`}
           >
             <span>{lang.flag}</span>
-            <span>{lang.name}</span>
+            <span>{lang.label}</span>
             {language === lang.code && <span className="ml-auto">✓</span>}
           </DropdownMenuItem>
         ))}

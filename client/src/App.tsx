@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
+import { useTranslation } from "react-i18next";
 import { useAuthFirebase } from "@/hooks/useAuthFirebase";
 import { logout } from "@/lib/firebaseAuth";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -72,7 +73,9 @@ export default function App() {
 }
 
 function AuthenticatedApp({ style }: { style: any }) {
+  const { t } = useTranslation();
   const { isAuthenticated, isLoading, user } = useAuthFirebase();
+  const [, setLocation] = useLocation();
 
   if (isLoading) {
     return (
@@ -88,6 +91,7 @@ function AuthenticatedApp({ style }: { style: any }) {
 
   const handleLogout = async () => {
     await logout();
+    setLocation("/login");
   };
 
   return (
@@ -102,7 +106,7 @@ function AuthenticatedApp({ style }: { style: any }) {
                 {user?.photoURL && (
                   <img 
                     src={user.photoURL} 
-                    alt="Profile" 
+                    alt={t("profile")} 
                     className="h-8 w-8 rounded-full object-cover"
                     data-testid="img-user-profile"
                   />

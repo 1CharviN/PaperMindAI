@@ -67,7 +67,8 @@ export class HybridStorage implements IStorage {
   async getAllDocuments(): Promise<(Document & { analysis?: DocumentAnalysis })[]> {
     if (!firebaseDb) return [];
 
-    const snapshot = await firebaseDb.collection(COLLECTIONS.DOCUMENTS)
+    const firestoreDb = firebaseDb;
+    const snapshot = await firestoreDb.collection(COLLECTIONS.DOCUMENTS)
       .orderBy("uploadedAt", "desc")
       .get();
 
@@ -76,7 +77,7 @@ export class HybridStorage implements IStorage {
         const docData = doc.data() as Document;
         
         // Get analysis if exists
-        const analysisRef = firebaseDb.collection(COLLECTIONS.ANALYSES).doc(doc.id);
+        const analysisRef = firestoreDb.collection(COLLECTIONS.ANALYSES).doc(doc.id);
         const analysisDoc = await analysisRef.get();
         const analysis = analysisDoc.exists ? (analysisDoc.data() as DocumentAnalysis) : undefined;
 
@@ -103,13 +104,13 @@ export class HybridStorage implements IStorage {
   }
 
   async updateDocumentStatus(id: string, status: Document["status"]): Promise<void> {
-    if (!db) return;
+    if (!firebaseDb) return;
 
     await firebaseDb.collection(COLLECTIONS.DOCUMENTS).doc(id).update({ status });
   }
 
   async deleteDocument(id: string): Promise<void> {
-    if (!db) return;
+    if (!firebaseDb) return;
 
     // Delete document
     await firebaseDb.collection(COLLECTIONS.DOCUMENTS).doc(id).delete();
@@ -119,7 +120,7 @@ export class HybridStorage implements IStorage {
   }
 
   async saveAnalysis(documentId: string, analysis: Partial<DocumentAnalysis>): Promise<void> {
-    if (!db) return;
+    if (!firebaseDb) return;
 
     const analysisRef = firebaseDb.collection(COLLECTIONS.ANALYSES).doc(documentId);
     const existing = await analysisRef.get();
@@ -132,7 +133,7 @@ export class HybridStorage implements IStorage {
   }
 
   async saveTTSAudio(documentId: string, audioUrl: string): Promise<void> {
-    if (!db) return;
+    if (!firebaseDb) return;
 
     await this.saveAnalysis(documentId, { ttsAudioUrl: audioUrl });
   }

@@ -37,15 +37,15 @@ export default function Upload() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
       toast({
-        title: "Success",
-        description: "Document uploaded successfully",
+        title: t("success"),
+        description: t("documentUploadedSuccessfully"),
       });
       setLocation(`/document/${data.id}`);
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to upload document",
+        title: t("error"),
+        description: error.message || t("failedToUploadDocument"),
         variant: "destructive",
       });
     },
@@ -56,8 +56,8 @@ export default function Upload() {
       const file = acceptedFiles[0];
       if (file.size > 10 * 1024 * 1024) {
         toast({
-          title: "Error",
-          description: "File size must be less than 10MB",
+          title: t("error"),
+          description: t("fileSizeMustBeLessThan10MB"),
           variant: "destructive",
         });
         return;
@@ -91,7 +91,7 @@ export default function Upload() {
       <div>
         <h1 className="text-4xl font-bold">{t("uploadTitle")}</h1>
         <p className="text-muted-foreground mt-2">
-          Upload PDF documents for AI-powered analysis
+          {t("uploadDescription")}
         </p>
       </div>
 
@@ -110,7 +110,7 @@ export default function Upload() {
               <input {...getInputProps()} data-testid="input-file" />
               <UploadIcon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-lg font-medium mb-2">
-                {isDragActive ? "Drop your file here" : t("uploadSubtitle")}
+                {isDragActive ? t("dropYourFileHere") : t("uploadSubtitle")}
               </h3>
               <p className="text-sm text-muted-foreground mb-1">
                 {t("supportedFormats")}
@@ -126,7 +126,7 @@ export default function Upload() {
                     {selectedFile.name}
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    {(selectedFile.size / 1024).toFixed(2)} KB
+                    {t("sizeKb", { size: (selectedFile.size / 1024).toFixed(2) })}
                   </p>
                 </div>
                 {!uploadMutation.isPending && (
@@ -160,7 +160,7 @@ export default function Upload() {
                   {uploadMutation.isPending ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Uploading...
+                      {t("uploading")}
                     </>
                   ) : (
                     <>
@@ -186,34 +186,31 @@ export default function Upload() {
 
       <Card>
         <CardContent className="p-6">
-          <h3 className="font-medium mb-4">What happens next?</h3>
+          <h3 className="font-medium mb-4">{t("whatHappensNext")}</h3>
           <ol className="space-y-3 text-sm text-muted-foreground">
             <li className="flex gap-3">
               <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-medium">
                 1
               </span>
-              <span>Your PDF will be uploaded and text will be extracted</span>
+              <span>{t("step1")}</span>
             </li>
             <li className="flex gap-3">
               <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-medium">
                 2
               </span>
-              <span>
-                AI will analyze the document and generate summary, citations, and
-                paraphrase
-              </span>
+              <span>{t("step2")}</span>
             </li>
             <li className="flex gap-3">
               <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-medium">
                 3
               </span>
-              <span>Plagiarism detection will calculate similarity scores</span>
+              <span>{t("step3")}</span>
             </li>
             <li className="flex gap-3">
               <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-medium">
                 4
               </span>
-              <span>You can generate audio and export results</span>
+              <span>{t("step4")}</span>
             </li>
           </ol>
         </CardContent>

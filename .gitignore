@@ -1,3 +1,61 @@
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Replit local state
+.local/
+
+# Dependencies
+node_modules/
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+
+# IDEs
+.vscode/
+.idea/
+
+# Build files
+dist/
+build/
+
+# Logs
+*.log
+
+# Test audio
+*.mp3
+
+# Archives
+*.tar.gz
+
+# Server generated files
+server/public/
+
+# Vite
+vite.config.ts.*.env
+.env.*
+!.env.example
+
+.local/
+node_modules/
+.DS_Store
+
+*.log
+*.mp3
+
+__pycache__/
+*.py[cod]
+
+.vscode/
+.idea/
+
+dist/
+build/
 node_modules
 dist
 .DS_Store

@@ -1,18 +1,20 @@
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { BookOpen, FileText, Sparkles, Globe, Mic } from "lucide-react";
 
 export default function Landing() {
+  const { t } = useTranslation();
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
       <div className="container mx-auto px-4 py-16">
         <header className="text-center mb-16">
           <div className="flex items-center justify-center gap-3 mb-6">
             <BookOpen className="h-12 w-12 text-primary" />
-            <h1 className="text-5xl font-bold">PaperMind AI</h1>
+            <h1 className="text-5xl font-bold">{t("landingTitle")}</h1>
           </div>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Your intelligent research assistant. Analyze academic papers with AI-powered insights.
+            {t("landingSubtitle")}
           </p>
         </header>
 
@@ -24,10 +26,10 @@ export default function Landing() {
                   <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
                     <FileText className="h-6 w-6 text-primary" />
                   </div>
-                  <h3 className="font-semibold text-lg">Smart Summaries</h3>
+                  <h3 className="font-semibold text-lg">{t("featureSmartSummaries")}</h3>
                 </div>
                 <p className="text-muted-foreground">
-                  Get concise, AI-generated summaries of complex research papers in seconds.
+                  {t("featureSmartSummariesDescription")}
                 </p>
               </CardContent>
             </Card>
@@ -38,10 +40,10 @@ export default function Landing() {
                   <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
                     <Sparkles className="h-6 w-6 text-primary" />
                   </div>
-                  <h3 className="font-semibold text-lg">Citation Extraction</h3>
+                  <h3 className="font-semibold text-lg">{t("featureCitationExtraction")}</h3>
                 </div>
                 <p className="text-muted-foreground">
-                  Automatically extract and format citations from your research documents.
+                  {t("featureCitationExtractionDescription")}
                 </p>
               </CardContent>
             </Card>
@@ -52,10 +54,10 @@ export default function Landing() {
                   <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
                     <Globe className="h-6 w-6 text-primary" />
                   </div>
-                  <h3 className="font-semibold text-lg">Plagiarism Detection</h3>
+                  <h3 className="font-semibold text-lg">{t("featurePlagiarismDetection")}</h3>
                 </div>
                 <p className="text-muted-foreground">
-                  Check your work for originality with advanced plagiarism detection.
+                  {t("featurePlagiarismDetectionDescription")}
                 </p>
               </CardContent>
             </Card>
@@ -66,10 +68,10 @@ export default function Landing() {
                   <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
                     <FileText className="h-6 w-6 text-primary" />
                   </div>
-                  <h3 className="font-semibold text-lg">Paraphrasing</h3>
+                  <h3 className="font-semibold text-lg">{t("featureParaphrasing")}</h3>
                 </div>
                 <p className="text-muted-foreground">
-                  Rewrite academic content while maintaining the original meaning and context.
+                  {t("featureParaphrasingDescription")}
                 </p>
               </CardContent>
             </Card>
@@ -80,10 +82,10 @@ export default function Landing() {
                   <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
                     <Mic className="h-6 w-6 text-primary" />
                   </div>
-                  <h3 className="font-semibold text-lg">Text-to-Speech</h3>
+                  <h3 className="font-semibold text-lg">{t("featureTextToSpeech")}</h3>
                 </div>
                 <p className="text-muted-foreground">
-                  Listen to your research papers with natural, AI-generated audio.
+                  {t("featureTextToSpeechDescription")}
                 </p>
               </CardContent>
             </Card>
@@ -94,10 +96,10 @@ export default function Landing() {
                   <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
                     <Globe className="h-6 w-6 text-primary" />
                   </div>
-                  <h3 className="font-semibold text-lg">Multi-Language</h3>
+                  <h3 className="font-semibold text-lg">{t("featureMultiLanguage")}</h3>
                 </div>
                 <p className="text-muted-foreground">
-                  Support for English, Spanish, French, German, and Chinese interfaces.
+                  {t("featureMultiLanguageDescription")}
                 </p>
               </CardContent>
             </Card>
@@ -108,16 +110,16 @@ export default function Landing() {
           <a href="/api/login">
             <Button size="lg" data-testid="button-login" className="gap-2">
               <Sparkles className="h-5 w-5" />
-              Get Started
+              {t("getStarted")}
             </Button>
           </a>
           <p className="mt-4 text-sm text-muted-foreground">
-            Sign in to start analyzing your research papers
+            {t("signInToStartAnalyzingYourResearchPapers")}
           </p>
         </div>
 
         <div className="mt-16 text-center text-sm text-muted-foreground">
-          <p>Powered by OpenAI GPT-5 and advanced AI technologies</p>
+          <p>{t("poweredBy")}</p>
         </div>
       </div>
     </div>

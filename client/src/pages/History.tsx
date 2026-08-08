@@ -39,15 +39,15 @@ export default function History() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
       toast({
-        title: "Success",
-        description: "Document deleted successfully",
+        title: t("success"),
+        description: t("deleteDocumentSuccess"),
       });
       setDeleteId(null);
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to delete document",
+        title: t("error"),
+        description: t("failedToDeleteDocument"),
         variant: "destructive",
       });
     },
@@ -61,9 +61,7 @@ export default function History() {
     <div className="space-y-8">
       <div>
         <h1 className="text-4xl font-bold">{t("history")}</h1>
-        <p className="text-muted-foreground mt-2">
-          View and manage all your processed documents
-        </p>
+        <p className="text-muted-foreground mt-2">{t("historyDescription")}</p>
       </div>
 
       <div className="flex items-center gap-4">
@@ -71,7 +69,7 @@ export default function History() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Search documents..."
+            placeholder={t("searchDocuments")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
@@ -96,16 +94,14 @@ export default function History() {
           <CardContent className="p-12 text-center">
             <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium mb-2">
-              {searchQuery ? "No documents found" : "No documents yet"}
+              {searchQuery ? t("noDocumentsFound") : t("noDocuments")}
             </h3>
             <p className="text-muted-foreground mb-6">
-              {searchQuery
-                ? "Try a different search term"
-                : "Upload your first research paper to get started"}
+              {searchQuery ? t("tryDifferentSearchTerm") : t("uploadYourFirstDocument")}
             </p>
             {!searchQuery && (
               <Button asChild>
-                <Link href="/upload">Upload Document</Link>
+                <Link href="/upload">{t("uploadDocument")}</Link>
               </Button>
             )}
           </CardContent>
@@ -129,10 +125,10 @@ export default function History() {
                         <span>
                           {new Date(doc.uploadedAt).toLocaleDateString()}
                         </span>
-                        <span>{(doc.fileSize / 1024).toFixed(0)} KB</span>
+                        <span>{t("sizeKb", { size: (doc.fileSize / 1024).toFixed(0) })}</span>
                         {doc.analysis?.plagiarismScore !== undefined && (
                           <span className="text-primary font-medium">
-                            {doc.analysis.plagiarismScore.toFixed(1)}% similarity
+                            {doc.analysis.plagiarismScore.toFixed(1)}% {t("similarity").toLowerCase()}
                           </span>
                         )}
                       </div>
@@ -169,21 +165,20 @@ export default function History() {
       <AlertDialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>{t("areYouSure")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this document and all its analysis data.
-              This action cannot be undone.
+              {t("deleteDocumentConfirmation")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel-delete">
-              Cancel
+              {t("cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteId && deleteMutation.mutate(deleteId)}
               data-testid="button-confirm-delete"
             >
-              Delete
+              {t("delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

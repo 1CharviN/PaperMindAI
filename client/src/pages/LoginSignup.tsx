@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +16,7 @@ export default function LoginSignup() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [, navigate] = useLocation();
+  const { t } = useTranslation();
   const { toast } = useToast();
 
   const handleEmailAuth = async (e: React.FormEvent) => {
@@ -25,8 +27,8 @@ export default function LoginSignup() {
       if (isSignUp) {
         if (password !== confirmPassword) {
           toast({
-            title: "Error",
-            description: "Passwords do not match",
+            title: t("error"),
+            description: t("passwordsDoNotMatch"),
             variant: "destructive",
           });
           setIsLoading(false);
@@ -34,8 +36,8 @@ export default function LoginSignup() {
         }
         if (password.length < 6) {
           toast({
-            title: "Error",
-            description: "Password must be at least 6 characters",
+            title: t("error"),
+            description: t("passwordMustBeAtLeast6Characters"),
             variant: "destructive",
           });
           setIsLoading(false);
@@ -43,14 +45,14 @@ export default function LoginSignup() {
         }
         await signUpWithEmail(email, password);
         toast({
-          title: "Success",
-          description: "Account created! Redirecting...",
+          title: t("success"),
+          description: t("accountCreatedRedirecting"),
         });
       } else {
         await loginWithEmail(email, password);
         toast({
-          title: "Success",
-          description: "Logged in! Redirecting...",
+          title: t("success"),
+          description: t("loggedInRedirecting"),
         });
       }
       setTimeout(() => navigate("/"), 1000);
@@ -60,13 +62,13 @@ export default function LoginSignup() {
       // Check if it's a Firebase configuration error
       if (errorMessage.includes("not configured") || errorMessage.includes("invalid-api-key")) {
         toast({
-          title: "Setup Required",
-          description: "Please configure Firebase credentials in your .env.local file",
+          title: t("setupRequired"),
+          description: t("configureFirebaseCredentials"),
           variant: "destructive",
         });
       } else {
         toast({
-          title: "Error",
+          title: t("error"),
           description: errorMessage,
           variant: "destructive",
         });
@@ -81,14 +83,14 @@ export default function LoginSignup() {
     try {
       await loginWithGoogle();
       toast({
-        title: "Success",
-        description: "Logged in with Google! Redirecting...",
+        title: t("success"),
+        description: t("loggedInWithGoogleRedirecting"),
       });
       setTimeout(() => navigate("/"), 1000);
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Google login failed",
+        title: t("error"),
+        description: error.message || t("googleLoginFailed"),
         variant: "destructive",
       });
     } finally {
@@ -105,11 +107,11 @@ export default function LoginSignup() {
             <h1 className="text-2xl font-bold">PaperMind AI</h1>
           </div>
           <div className="text-center">
-            <CardTitle>{isSignUp ? "Create Account" : "Welcome Back"}</CardTitle>
+            <CardTitle>{isSignUp ? t("createAccount") : t("welcomeBack")}</CardTitle>
             <CardDescription>
               {isSignUp
-                ? "Sign up to start analyzing research papers"
-                : "Sign in to your account"}
+                ? t("signUpToStartAnalyzingResearchPapers")
+                : t("signInToYourAccount")}
             </CardDescription>
           </div>
         </CardHeader>
@@ -118,12 +120,12 @@ export default function LoginSignup() {
           <form onSubmit={handleEmailAuth} className="space-y-4">
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium">
-                Email
+                {t("email")}
               </label>
               <Input
                 id="email"
                 type="email"
-                placeholder="your@email.com"
+                placeholder={t("emailPlaceholder")}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={isLoading}
@@ -134,12 +136,12 @@ export default function LoginSignup() {
 
             <div className="space-y-2">
               <label htmlFor="password" className="text-sm font-medium">
-                Password
+                {t("password")}
               </label>
               <Input
                 id="password"
                 type="password"
-                placeholder="Enter your password"
+                placeholder={t("enterYourPassword")}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={isLoading}
@@ -151,12 +153,12 @@ export default function LoginSignup() {
             {isSignUp && (
               <div className="space-y-2">
                 <label htmlFor="confirm-password" className="text-sm font-medium">
-                  Confirm Password
+                  {t("confirmPassword")}
                 </label>
                 <Input
                   id="confirm-password"
                   type="password"
-                  placeholder="Confirm your password"
+                  placeholder={t("confirmYourPassword")}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   disabled={isLoading}
@@ -175,12 +177,12 @@ export default function LoginSignup() {
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {isSignUp ? "Creating account..." : "Signing in..."}
+                  {isSignUp ? t("creatingAccount") : t("signingIn")}
                 </>
               ) : isSignUp ? (
-                "Create Account"
+                t("createAccount")
               ) : (
-                "Sign In"
+                t("signIn")
               )}
             </Button>
           </form>
@@ -190,7 +192,7 @@ export default function LoginSignup() {
               <div className="w-full border-t border-muted" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+              <span className="bg-card px-2 text-muted-foreground">{t("orContinueWith")}</span>
             </div>
           </div>
 
@@ -203,12 +205,12 @@ export default function LoginSignup() {
             data-testid="button-google-login"
           >
             <SiGoogle className="h-4 w-4" />
-            Google
+            {t("google")}
           </Button>
 
           <div className="text-center text-sm">
             <span className="text-muted-foreground">
-              {isSignUp ? "Already have an account? " : "Don't have an account? "}
+              {isSignUp ? t("alreadyHaveAnAccount") : t("dontHaveAnAccount")}
             </span>
             <button
               type="button"
@@ -221,7 +223,7 @@ export default function LoginSignup() {
               className="text-primary hover:underline font-medium"
               data-testid="button-toggle-auth-mode"
             >
-              {isSignUp ? "Sign In" : "Sign Up"}
+              {isSignUp ? t("signIn") : t("signUp")}
             </button>
           </div>
         </CardContent>

@@ -80,10 +80,19 @@ export type GenerateTTSRequest = z.infer<typeof generateTTSSchema>;
 // Combined document with analysis
 export type DocumentWithAnalysis = Document & { analysis?: DocumentAnalysis };
 
-// User preferences (for theme and language)
 export const userPreferencesSchema = z.object({
   theme: z.enum(["light", "dark"]).default("light"),
-  language: z.enum(["en", "es", "fr", "de", "zh"]).default("en"),
+  language: z.enum([
+    "en", // English
+    "hi", // Hindi
+    "ta", // Tamil
+    "te", // Telugu
+    "kn", // Kannada
+    "ml", // Malayalam
+    "bn", // Bengali
+    "gu", // Gujarati
+    "mr", // Marathi
+    "pa", // Punjabi
+  ]).default("en"),
 });
-
 export type UserPreferences = z.infer<typeof userPreferencesSchema>;

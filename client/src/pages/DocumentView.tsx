@@ -45,14 +45,14 @@ export default function DocumentView() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/documents", id] });
       toast({
-        title: "Success",
-        description: "Analysis completed successfully",
+        title: t("success"),
+        description: t("analysisCompletedSuccessfully"),
       });
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to analyze document",
+        title: t("error"),
+        description: t("failedToAnalyzeDocument"),
         variant: "destructive",
       });
     },
@@ -68,14 +68,14 @@ export default function DocumentView() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/documents", id] });
       toast({
-        title: "Success",
-        description: "Audio generated successfully",
+        title: t("success"),
+        description: t("audioGeneratedSuccessfully"),
       });
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to generate audio",
+        title: t("error"),
+        description: t("failedToGenerateAudio"),
         variant: "destructive",
       });
     },
@@ -108,8 +108,8 @@ export default function DocumentView() {
     URL.revokeObjectURL(url);
 
     toast({
-      title: "Success",
-      description: "Data exported successfully",
+      title: t("success"),
+      description: t("dataExportedSuccessfully"),
     });
   };
 
@@ -134,10 +134,8 @@ export default function DocumentView() {
       <Card>
         <CardContent className="p-12 text-center">
           <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium mb-2">Document not found</h3>
-          <Button onClick={() => setLocation("/history")}>
-            Go to History
-          </Button>
+          <h3 className="text-lg font-medium mb-2">{t("documentNotFound")}</h3>
+          <Button onClick={() => setLocation("/history")}>{t("goToHistory")}</Button>
         </CardContent>
       </Card>
     );
@@ -167,39 +165,52 @@ export default function DocumentView() {
               {document.filename}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Uploaded {new Date(document.uploadedAt).toLocaleDateString()} •{" "}
-              {(document.fileSize / 1024).toFixed(0)} KB
+              {t("uploadedOnSize", {
+                date: new Date(document.uploadedAt).toLocaleDateString(),
+                size: (document.fileSize / 1024).toFixed(0),
+              })}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {!hasAnalysis && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            {!hasAnalysis && (
+              <Button
+                onClick={() => analyzeMutation.mutate()}
+                disabled={analyzeMutation.isPending}
+                data-testid="button-analyze"
+              >
+                {analyzeMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    {t("analyzing")}
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    {t("analyzeDocument")}
+                  </>
+                )}
+              </Button>
+            )}
             <Button
-              onClick={() => analyzeMutation.mutate()}
-              disabled={analyzeMutation.isPending}
-              data-testid="button-analyze"
+              variant="outline"
+              onClick={handleExport}
+              data-testid="button-export"
             >
-              {analyzeMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Analyzing...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Analyze Document
-                </>
-              )}
+              <Download className="h-4 w-4 mr-2" />
+              {t("export")}
             </Button>
+          </div>
+
+          {analyzeMutation.isPending && (
+            <Card>
+              <CardContent className="p-4 flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>{t("analysisInProgress")}</span>
+              </CardContent>
+            </Card>
           )}
-          <Button
-            variant="outline"
-            onClick={handleExport}
-            data-testid="button-export"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
         </div>
       </div>
 
@@ -207,7 +218,7 @@ export default function DocumentView() {
         <div className="lg:col-span-2 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Extracted Text</CardTitle>
+              <CardTitle>{t("extractedText")}</CardTitle>
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-96">
@@ -221,7 +232,7 @@ export default function DocumentView() {
           {hasAnalysis && (
             <Card>
               <CardHeader>
-                <CardTitle>AI Analysis Results</CardTitle>
+                <CardTitle>{t("aiAnalysisResults")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <Tabs value={selectedTab} onValueChange={setSelectedTab}>
@@ -255,7 +266,7 @@ export default function DocumentView() {
                           {ttsMutation.isPending ? (
                             <>
                               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Generating...
+                              {t("generating")}
                             </>
                           ) : (
                             <>
@@ -267,7 +278,7 @@ export default function DocumentView() {
                       </div>
                     ) : (
                       <p className="text-muted-foreground">
-                        No summary available
+                        {t("noSummaryAvailable")}
                       </p>
                     )}
                   </TabsContent>
@@ -287,7 +298,7 @@ export default function DocumentView() {
                       </ol>
                     ) : (
                       <p className="text-muted-foreground">
-                        No citations found
+                        {t("noCitationsFound")}
                       </p>
                     )}
                   </TabsContent>
@@ -299,7 +310,7 @@ export default function DocumentView() {
                       </p>
                     ) : (
                       <p className="text-muted-foreground">
-                        No paraphrase available
+                        {t("noParaphraseAvailable")}
                       </p>
                     )}
                   </TabsContent>
@@ -318,25 +329,25 @@ export default function DocumentView() {
                             }
                             data-testid="plagiarism-badge"
                           >
-                            {document.analysis.plagiarismScore.toFixed(1)}% Similarity
+                            {t("similarityScore", {
+                              score: document.analysis.plagiarismScore.toFixed(1),
+                            })}
                           </Badge>
                           <span className="text-sm text-muted-foreground">
                             {document.analysis.plagiarismScore < 20
-                              ? "Low risk"
+                              ? t("lowRisk")
                               : document.analysis.plagiarismScore < 50
-                              ? "Moderate risk"
-                              : "High risk"}
+                              ? t("moderateRisk")
+                              : t("highRisk")}
                           </span>
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          This score represents the similarity between the document
-                          and potential sources. Lower scores indicate more original
-                          content.
+                          {t("similarityDescription")}
                         </p>
                       </div>
                     ) : (
                       <p className="text-muted-foreground">
-                        No plagiarism score available
+                        {t("noPlagiarismScoreAvailable")}
                       </p>
                     )}
                   </TabsContent>
@@ -362,7 +373,7 @@ export default function DocumentView() {
             <Card>
               <CardContent className="p-6">
                 <div className="text-sm text-muted-foreground mb-1">
-                  Processing Time
+                  {t("processingTime")}
                 </div>
                 <div className="text-2xl font-bold">
                   {document.analysis.processingTime.toFixed(2)}s

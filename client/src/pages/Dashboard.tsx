@@ -17,16 +17,20 @@ export default function Dashboard() {
 
   const stats = {
     total: documents?.length || 0,
-    processedToday: documents?.filter(
-      (doc) =>
-        new Date(doc.uploadedAt).toDateString() === new Date().toDateString()
-    ).length || 0,
-    avgPlagiarism:
-      documents?.reduce((acc, doc) => acc + (doc.analysis?.plagiarismScore || 0), 0) /
-        (documents?.length || 1) || 0,
-    avgProcessingTime:
-      documents?.reduce((acc, doc) => acc + (doc.analysis?.processingTime || 0), 0) /
-        (documents?.length || 1) || 0,
+    processedToday: documents
+      ? documents.filter(
+          (doc) =>
+            new Date(doc.uploadedAt).toDateString() === new Date().toDateString()
+        ).length
+      : 0,
+    avgPlagiarism: documents
+      ? documents.reduce((acc, doc) => acc + (doc.analysis?.plagiarismScore || 0), 0) /
+          documents.length
+      : 0,
+    avgProcessingTime: documents
+      ? documents.reduce((acc, doc) => acc + (doc.analysis?.processingTime || 0), 0) /
+          documents.length
+      : 0,
   };
 
   const recentDocuments = documents?.slice(0, 5) || [];
@@ -34,9 +38,9 @@ export default function Dashboard() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-4xl font-bold">{t("welcomeBack")}</h1>
+        <h1 className="text-4xl font-bold">{t("welcome")}</h1>
         <p className="text-muted-foreground mt-2">
-          Analyze your research papers with AI-powered insights
+          {t("subtitle")}
         </p>
       </div>
 
@@ -107,13 +111,13 @@ export default function Dashboard() {
           <Card>
             <CardContent className="p-12 text-center">
               <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">No documents yet</h3>
+              <h3 className="text-lg font-medium mb-2">{t("noDocuments")}</h3>
               <p className="text-muted-foreground mb-6">
-                Upload your first research paper to get started
+                {t("uploadYourFirstDocument")}
               </p>
               <Button asChild>
                 <Link href="/upload" data-testid="link-upload-first">
-                  Upload Document
+                  {t("uploadDocument")}
                 </Link>
               </Button>
             </CardContent>
@@ -130,8 +134,7 @@ export default function Dashboard() {
                           {doc.filename}
                         </h3>
                         <p className="text-sm text-muted-foreground mt-1">
-                          {new Date(doc.uploadedAt).toLocaleDateString()} •{" "}
-                          {(doc.fileSize / 1024).toFixed(0)} KB
+                          {new Date(doc.uploadedAt).toLocaleDateString()} • {t("sizeKb", { size: (doc.fileSize / 1024).toFixed(0) })}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -141,7 +144,7 @@ export default function Dashboard() {
                               {doc.analysis.plagiarismScore.toFixed(1)}%
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              Similarity
+                              {t("similarity")}
                             </div>
                           </div>
                         )}

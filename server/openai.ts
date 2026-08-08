@@ -1,120 +1,141 @@
 import OpenAI from "openai";
+import { getAllAudioBase64 } from "google-tts-api";
 
-// the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
-if (!process.env.OPENAI_API_KEY) {
-  throw new Error("OPENAI_API_KEY environment variable is not set");
-}
-
-const openai = new OpenAI({ 
-  apiKey: process.env.OPENAI_API_KEY 
+// 1. SETUP CLIENT (Uses Groq)
+const openai = new OpenAI({
+  apiKey: process.env.GROQ_API_KEY || "dummy_key", 
+  baseURL: "https://api.groq.com/openai/v1",
 });
 
-export async function generateSummary(text: string): Promise<string> {
-  const prompt = `Please provide a concise academic summary of the following research paper text. Focus on the main findings, methodology, and conclusions:\n\n${text.slice(0, 12000)}`;
-
-  const response = await openai.chat.completions.create({
-    model: "gpt-5",
-    messages: [
-      {
-        role: "system",
-        content: "You are an academic research assistant specialized in summarizing scholarly papers.",
-      },
-      {
-        role: "user",
-        content: prompt,
-      },
-    ],
-    max_completion_tokens: 500,
-  });
-
-  return response.choices[0].message.content || "No summary generated";
+// Helper: Truncate text to avoid rate limits
+function truncateText(text: string, maxLength: number = 15000): string {
+  if (!text) return "";
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength) + "... [Text truncated]";
 }
 
-export async function extractCitations(text: string): Promise<string[]> {
-  const prompt = `Extract all citations and references from the following research paper text. Return them as a JSON array of strings. Each citation should be a complete reference.\n\nText:\n${text.slice(0, 12000)}\n\nRespond with JSON in this format: { "citations": ["citation1", "citation2", ...] }`;
+// 2. EXPORTED FUNCTIONS
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-5",
-    messages: [
-      {
-        role: "system",
-        content: "You are an expert at extracting academic citations and references from research papers.",
-      },
-      {
-        role: "user",
-        content: prompt,
-      },
-    ],
-    response_format: { type: "json_object" },
-    max_completion_tokens: 1000,
-  });
-
+export async function generateSummary(text: string) {
   try {
-    const result = JSON.parse(response.choices[0].message.content || "{}");
-    return result.citations || [];
-  } catch {
-    return [];
+    const response = await openai.chat.completions.create({
+      model: "llama-3.1-8b-instant",
+      messages: [
+        { role: "system", content: "You are a research assistant. Summarize the text concisely." },
+        { role: "user", content: `Summarize this:\n\n${truncateText(text)}` }
+      ],
+    });
+    return response.choices[0].message.content || "No summary generated.";
+  } catch (error) {
+    console.error("Groq Summary Error:", error);
+    return "Summary unavailable.";
   }
 }
 
-export async function generateParaphrase(text: string): Promise<string> {
-  const prompt = `Paraphrase the following research paper excerpt while maintaining its academic tone and technical accuracy. Keep the meaning intact but use different sentence structures and vocabulary:\n\n${text.slice(0, 8000)}`;
+// ... inside server/openai.ts ...
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-5",
-    messages: [
-      {
-        role: "system",
-        content: "You are an academic writing assistant specializing in paraphrasing scholarly content.",
-      },
-      {
-        role: "user",
-        content: prompt,
-      },
-    ],
-    max_completion_tokens: 1000,
-  });
+export async function extractCitations(text: string) {
+  try {
+    const response = await openai.chat.completions.create({
+      model: "llama-3.1-8b-instant",
+      messages: [
+        { 
+          role: "system", 
+          content: "You are a research assistant. Identify the 'References' or 'Bibliography' section in the text provided. Extract the full citations. Return them as a clean list separated by newlines. Do not number the lines." 
+        },
+        { 
+          role: "user", 
+          content: `Extract the full references list from the end of this document:\n\n${truncateText(text)}` 
+        }
+      ],
+    });
 
-  return response.choices[0].message.content || "No paraphrase generated";
+    const content = response.choices[0].message.content || "";
+    
+    const citationsList = content.split("\n")
+      .map(line => line.trim())
+      .filter(line => line.length > 5) // Filter out short noise like "References" or "Page 2"
+      .map(line => line.replace(/^\d+[\.\)]\s*/, '')); // 🟢 FIX: Remove "1." or "1)" from start
+
+    if (citationsList.length === 0) {
+      return ["No bibliography found in the scanned text."];
+    }
+
+    return citationsList;
+
+  } catch (error) {
+    console.error("Groq Citations Error:", error);
+    return ["Error extracting citations."];
+  }
 }
 
-export async function calculatePlagiarismScore(text: string): Promise<number> {
-  // This is a simplified plagiarism detection
-  // In production, you would compare against external databases
-  const prompt = `Analyze the following text and estimate its originality score as a percentage. Consider factors like unique phrasing, novel ideas, and academic writing quality. Return a plagiarism similarity score between 0-100, where 0 is completely original and 100 is completely plagiarized.\n\nText:\n${text.slice(0, 8000)}\n\nRespond with JSON in this format: { "plagiarismScore": number, "reasoning": "brief explanation" }`;
-
-  const response = await openai.chat.completions.create({
-    model: "gpt-5",
-    messages: [
-      {
-        role: "system",
-        content: "You are a plagiarism detection expert analyzing academic texts for originality.",
-      },
-      {
-        role: "user",
-        content: prompt,
-      },
-    ],
-    response_format: { type: "json_object" },
-    max_completion_tokens: 300,
-  });
-
+export async function generateParaphrase(text: string) {
   try {
-    const result = JSON.parse(response.choices[0].message.content || "{}");
-    // Return a realistic score between 5-30% for most academic papers
-    return Math.min(100, Math.max(0, result.plagiarismScore || 15));
-  } catch {
-    return 15; // Default moderate score
+    const response = await openai.chat.completions.create({
+      model: "llama-3.1-8b-instant",
+      messages: [
+        { role: "system", content: "Rewrite the text in an academic tone." },
+        { role: "user", content: `Paraphrase this:\n\n${truncateText(text, 2000)}` }
+      ],
+    });
+    return response.choices[0].message.content || "Paraphrase unavailable.";
+  } catch (error) {
+    console.error("Groq Paraphrase Error:", error);
+    return "Error generating paraphrase.";
+  }
+}
+
+// ⚠️ THIS IS THE FIX FOR YOUR CURRENT ERROR ⚠️
+export async function calculatePlagiarismScore(text: string) {
+  try {
+    const response = await openai.chat.completions.create({
+      model: "llama-3.1-8b-instant",
+      messages: [
+        { role: "system", content: "You are a plagiarism detector. Return ONLY a number between 0 and 100 representing the plagiarism risk. Do not write any words, just the number." },
+        { role: "user", content: `Analyze this text:\n\n${truncateText(text, 2000)}` }
+      ],
+    });
+
+    const content = response.choices[0].message.content || "0";
+    
+    // Parse the number from the string (e.g. "85%" -> 85)
+    const match = content.match(/(\d+(\.\d+)?)/);
+    const score = match ? parseFloat(match[0]) : 0;
+    
+    // Return a NUMBER (Fixes .toFixed error)
+    return score;
+
+  } catch (error) {
+    console.error("Groq Plagiarism Error:", error);
+    return 0; // Return 0 on error so the app doesn't crash
   }
 }
 
 export async function generateTTS(text: string): Promise<Buffer> {
-  const mp3 = await openai.audio.speech.create({
-    model: "tts-1",
-    voice: "alloy",
-    input: text.slice(0, 4000), // TTS has character limits
-  });
+  try {
+    if (!text || !text.trim()) {
+      throw new Error("Text must not be empty for TTS generation.");
+    }
 
-  const buffer = Buffer.from(await mp3.arrayBuffer());
-  return buffer;
+    const normalizedText = text.trim();
+    const audioChunks = await getAllAudioBase64(normalizedText, {
+      lang: "en",
+      slow: false,
+      splitPunct: ".",
+      timeout: 20000,
+    });
+
+    if (!audioChunks || audioChunks.length === 0) {
+      throw new Error("No audio chunks returned from TTS service.");
+    }
+
+    const buffers = audioChunks.map((chunk) =>
+      Buffer.from(chunk.base64, "base64"),
+    );
+
+    return Buffer.concat(buffers);
+  } catch (error) {
+    console.error("TTS generation error:", error);
+    throw error;
+  }
 }
