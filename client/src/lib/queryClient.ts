@@ -4,7 +4,14 @@ import { getAuthToken } from "./firebaseAuth";
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    let message = text;
+    try {
+      const body = JSON.parse(text) as { error?: string; message?: string };
+      message = body.error || body.message || text;
+    } catch {
+      // Keep plain-text API errors unchanged.
+    }
+    throw new Error(`${res.status}: ${message}`);
   }
 }
 

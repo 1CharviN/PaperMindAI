@@ -50,6 +50,7 @@ export default function DocumentView() {
       });
     },
     onError: (error) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/documents", id] });
       toast({
         title: t("error"),
         description: error instanceof Error ? error.message : t("failedToAnalyzeDocument"),
@@ -155,6 +156,10 @@ export default function DocumentView() {
     document.analysis.paraphrase ||
     document.analysis.plagiarismScore !== undefined
   );
+  const hasCompleteAnalysis = document.analysis?.summary &&
+    document.analysis.citations &&
+    document.analysis.paraphrase &&
+    document.analysis.plagiarismScore !== undefined;
 
   return (
     <div className="space-y-8">
@@ -182,7 +187,7 @@ export default function DocumentView() {
         </div>
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
-            {!hasAnalysis && (
+            {!hasCompleteAnalysis && (
               <Button
                 onClick={() => analyzeMutation.mutate()}
                 disabled={analyzeMutation.isPending}

@@ -358,7 +358,8 @@ import OpenAI from "openai";
 import { getAllAudioBase64 } from "google-tts-api";
 var geminiClient = process.env.GEMINI_API_KEY ? new OpenAI({
   apiKey: process.env.GEMINI_API_KEY,
-  baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
+  baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+  maxRetries: 1
 }) : null;
 var geminiModel = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";
 async function createChatCompletion(messages) {
@@ -521,37 +522,41 @@ async function registerRoutes(app3) {
       const tasks = [];
       if (operations.includes("summary")) {
         console.log("Generating summary...");
-        tasks.push(
-          generateSummary(textStart).then((result) => {
-            analysis.summary = result;
-          })
-        );
+        tasks.push({ name: "summary", run: async () => ({ summary: await generateSummary(textStart) }) });
       }
       if (operations.includes("citations")) {
         console.log("Extracting citations...");
-        tasks.push(
-          extractCitations(textEnd).then((result) => {
-            analysis.citations = result;
-          })
-        );
+        tasks.push({ name: "citations", run: async () => ({ citations: await extractCitations(textEnd) }) });
       }
       if (operations.includes("paraphrase")) {
         console.log("Generating paraphrase...");
-        tasks.push(
-          generateParaphrase(textStart).then((result) => {
-            analysis.paraphrase = result;
-          })
-        );
+        tasks.push({ name: "paraphrase", run: async () => ({ paraphrase: await generateParaphrase(textStart) }) });
       }
       if (operations.includes("plagiarism")) {
         console.log("Calculating plagiarism...");
-        tasks.push(
-          calculatePlagiarismScore(textStart).then((result) => {
-            analysis.plagiarismScore = result;
-          })
-        );
+        tasks.push({
+          name: "plagiarism",
+          run: async () => ({ plagiarismScore: await calculatePlagiarismScore(textStart) })
+        });
       }
-      await Promise.all(tasks);
+      for (let index2 = 0; index2 < tasks.length; index2 += 2) {
+        const batch = tasks.slice(index2, index2 + 2);
+        const results = await Promise.allSettled(batch.map((task) => task.run()));
+        let batchFailed = false;
+        let batchError;
+        for (let resultIndex = 0; resultIndex < results.length; resultIndex++) {
+          const result = results[resultIndex];
+          if (result.status === "rejected") {
+            console.error(`Gemini ${batch[resultIndex].name} operation failed:`, result.reason);
+            batchFailed = true;
+            batchError ??= result.reason;
+            continue;
+          }
+          Object.assign(analysis, result.value);
+          await storage.saveAnalysis(validatedData.documentId, result.value, ownerId);
+        }
+        if (batchFailed) throw batchError;
+      }
       analysis.processingTime = (Date.now() - startTime) / 1e3;
       await storage.saveAnalysis(validatedData.documentId, analysis, ownerId);
       await storage.updateDocumentStatus(validatedData.documentId, "completed", ownerId);
@@ -573,7 +578,14 @@ async function registerRoutes(app3) {
         });
       }
       if (error?.status === 429) {
-        return res.status(429).json({ error: "AI Service Busy. Please wait a moment." });
+        return res.status(429).json({
+          error: "Gemini is rate-limiting requests. Wait a moment, then retry the missing analysis."
+        });
+      }
+      if (error?.status === 503 || error?.status >= 500 && error?.status <= 599) {
+        return res.status(503).json({
+          error: "Gemini is temporarily unavailable. Completed results were saved; please retry the analysis shortly."
+        });
       }
       res.status(500).send(error.message || "Analysis failed");
     }

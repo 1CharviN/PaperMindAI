@@ -112,49 +112,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const textStart = document.extractedText.slice(0, 15000);
       const textEnd = document.extractedText.slice(-15000);
 
-      const tasks: Promise<void>[] = [];
+      const tasks: { name: string; run: () => Promise<Partial<import("@shared/schema").DocumentAnalysis>> }[] = [];
 
       if (operations.includes("summary")) {
         console.log("Generating summary...");
-        tasks.push(
-          generateSummary(textStart)
-            .then((result) => {
-              analysis.summary = result;
-            }),
-        );
+        tasks.push({ name: "summary", run: async () => ({ summary: await generateSummary(textStart) }) });
       }
 
       if (operations.includes("citations")) {
         console.log("Extracting citations...");
-        tasks.push(
-          extractCitations(textEnd)
-            .then((result) => {
-              analysis.citations = result;
-            }),
-        );
+        tasks.push({ name: "citations", run: async () => ({ citations: await extractCitations(textEnd) }) });
       }
 
       if (operations.includes("paraphrase")) {
         console.log("Generating paraphrase...");
-        tasks.push(
-          generateParaphrase(textStart)
-            .then((result) => {
-              analysis.paraphrase = result;
-            }),
-        );
+        tasks.push({ name: "paraphrase", run: async () => ({ paraphrase: await generateParaphrase(textStart) }) });
       }
 
       if (operations.includes("plagiarism")) {
         console.log("Calculating plagiarism...");
-        tasks.push(
-          calculatePlagiarismScore(textStart)
-            .then((result) => {
-              analysis.plagiarismScore = result;
-            }),
-        );
+        tasks.push({
+          name: "plagiarism",
+          run: async () => ({ plagiarismScore: await calculatePlagiarismScore(textStart) }),
+        });
       }
 
-      await Promise.all(tasks);
+      for (let index = 0; index < tasks.length; index += 2) {
+        const batch = tasks.slice(index, index + 2);
+        const results = await Promise.allSettled(batch.map((task) => task.run()));
+        let batchFailed = false;
+        let batchError: unknown;
+        for (let resultIndex = 0; resultIndex < results.length; resultIndex++) {
+          const result = results[resultIndex];
+          if (result.status === "rejected") {
+            console.error(`Gemini ${batch[resultIndex].name} operation failed:`, result.reason);
+            batchFailed = true;
+            batchError ??= result.reason;
+            continue;
+          }
+          Object.assign(analysis, result.value);
+          await storage.saveAnalysis(validatedData.documentId, result.value, ownerId);
+        }
+        if (batchFailed) throw batchError;
+      }
 
       analysis.processingTime = (Date.now() - startTime) / 1000;
       await storage.saveAnalysis(validatedData.documentId, analysis, ownerId);
@@ -181,7 +181,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       if (error?.status === 429) {
-         return res.status(429).json({ error: "AI Service Busy. Please wait a moment." });
+        return res.status(429).json({
+          error: "Gemini is rate-limiting requests. Wait a moment, then retry the missing analysis.",
+        });
+      }
+      if (error?.status === 503 || (error?.status >= 500 && error?.status <= 599)) {
+        return res.status(503).json({
+          error: "Gemini is temporarily unavailable. Completed results were saved; please retry the analysis shortly.",
+        });
       }
       res.status(500).send(error.message || "Analysis failed");
     }
