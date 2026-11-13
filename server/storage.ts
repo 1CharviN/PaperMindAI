@@ -61,7 +61,7 @@ export class HybridStorage implements IStorage {
     const analysisDoc = await analysisRef.get();
     const analysis = analysisDoc.exists ? (analysisDoc.data() as DocumentAnalysis) : undefined;
 
-    return { ...docData, analysis };
+    return { ...docData, id: doc.id, analysis };
   }
 
   async getAllDocuments(): Promise<(Document & { analysis?: DocumentAnalysis })[]> {
@@ -81,7 +81,7 @@ export class HybridStorage implements IStorage {
         const analysisDoc = await analysisRef.get();
         const analysis = analysisDoc.exists ? (analysisDoc.data() as DocumentAnalysis) : undefined;
 
-        return { ...docData, analysis };
+        return { ...docData, id: doc.id, analysis };
       })
     );
 

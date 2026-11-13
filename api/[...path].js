@@ -193,7 +193,7 @@ var HybridStorage = class {
     const analysisRef = db.collection(COLLECTIONS.ANALYSES).doc(id);
     const analysisDoc = await analysisRef.get();
     const analysis = analysisDoc.exists ? analysisDoc.data() : void 0;
-    return { ...docData, analysis };
+    return { ...docData, id: doc.id, analysis };
   }
   async getAllDocuments() {
     if (!db) return [];
@@ -205,7 +205,7 @@ var HybridStorage = class {
         const analysisRef = firestoreDb.collection(COLLECTIONS.ANALYSES).doc(doc.id);
         const analysisDoc = await analysisRef.get();
         const analysis = analysisDoc.exists ? analysisDoc.data() : void 0;
-        return { ...docData, analysis };
+        return { ...docData, id: doc.id, analysis };
       })
     );
     return documents;
