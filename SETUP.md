@@ -51,6 +51,30 @@ npm run dev
 
 The app will be available at `http://localhost:5000`
 
+## Deploy to Vercel
+
+1. Push the project to GitHub, then import the repository in [Vercel](https://vercel.com/new).
+2. Keep the project root as the **Root Directory**. Vercel uses `vercel.json` to run `npm run build`, serve `dist/public`, and route `/api/*` requests to the Express API function.
+3. In **Project Settings → Environment Variables**, add the following variables from your local `.env.local`. Add them separately for Production (and Preview if you need preview deployments):
+
+   - `GEMINI_API_KEY`
+   - `FIREBASE_PROJECT_ID`
+   - `FIREBASE_CLIENT_EMAIL`
+   - `FIREBASE_PRIVATE_KEY`
+   - `DATABASE_URL`
+   - `VITE_FIREBASE_API_KEY`
+   - `VITE_FIREBASE_AUTH_DOMAIN`
+   - `VITE_FIREBASE_PROJECT_ID`
+   - `VITE_FIREBASE_STORAGE_BUCKET`
+   - `VITE_FIREBASE_MESSAGING_SENDER_ID`
+   - `VITE_FIREBASE_APP_ID`
+
+   Paste the values into Vercel's environment-variable fields; never commit `.env.local`. `GEMINI_MODEL` is optional and defaults to `gemini-3.1-flash-lite`.
+4. Deploy. When you change environment variables, redeploy so the frontend is rebuilt with the updated `VITE_FIREBASE_*` values.
+5. In Firebase Console, add your deployed `*.vercel.app` hostname under **Authentication → Settings → Authorized domains**.
+
+The Vercel API function has a 60-second maximum duration. Vercel also limits request-body size, so use PDFs smaller than 4 MB with the current upload endpoint. This project needs Firebase Admin credentials and `DATABASE_URL` in Vercel; without them its server-side storage cannot initialize or persist documents correctly.
+
 ## Features
 
 ✅ **Firebase Authentication** - Email/password and Google login
