@@ -49,10 +49,10 @@ export default function DocumentView() {
         description: t("analysisCompletedSuccessfully"),
       });
     },
-    onError: () => {
+    onError: (error) => {
       toast({
         title: t("error"),
-        description: t("failedToAnalyzeDocument"),
+        description: error instanceof Error ? error.message : t("failedToAnalyzeDocument"),
         variant: "destructive",
       });
     },
