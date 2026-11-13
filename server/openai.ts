@@ -1,11 +1,26 @@
 import OpenAI from "openai";
 import { getAllAudioBase64 } from "google-tts-api";
 
-// 1. SETUP CLIENT (Uses Groq)
-const openai = new OpenAI({
-  apiKey: process.env.GROQ_API_KEY || "dummy_key", 
-  baseURL: "https://api.groq.com/openai/v1",
-});
+const geminiClient = process.env.GEMINI_API_KEY
+  ? new OpenAI({
+      apiKey: process.env.GEMINI_API_KEY,
+      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+    })
+  : null;
+const geminiModel = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";
+
+async function createChatCompletion(
+  messages: OpenAI.Chat.Completions.ChatCompletionCreateParams["messages"],
+) {
+  if (!geminiClient) {
+    throw new Error("Gemini is not configured. Set GEMINI_API_KEY in the server environment.");
+  }
+
+  return geminiClient.chat.completions.create({
+    model: geminiModel,
+    messages,
+  });
+}
 
 // Helper: Truncate text to avoid rate limits
 function truncateText(text: string, maxLength: number = 15000): string {
@@ -17,98 +32,56 @@ function truncateText(text: string, maxLength: number = 15000): string {
 // 2. EXPORTED FUNCTIONS
 
 export async function generateSummary(text: string) {
-  try {
-    const response = await openai.chat.completions.create({
-      model: "llama-3.1-8b-instant",
-      messages: [
-        { role: "system", content: "You are a research assistant. Summarize the text concisely." },
-        { role: "user", content: `Summarize this:\n\n${truncateText(text)}` }
-      ],
-    });
-    return response.choices[0].message.content || "No summary generated.";
-  } catch (error) {
-    console.error("Groq Summary Error:", error);
-    return "Summary unavailable.";
-  }
+  const response = await createChatCompletion([
+    { role: "system", content: "You are a research assistant. Summarize the text concisely." },
+    { role: "user", content: `Summarize this:\n\n${truncateText(text)}` }
+  ]);
+  return response.choices[0].message.content || "No summary generated.";
 }
 
-// ... inside server/openai.ts ...
-
 export async function extractCitations(text: string) {
-  try {
-    const response = await openai.chat.completions.create({
-      model: "llama-3.1-8b-instant",
-      messages: [
-        { 
-          role: "system", 
-          content: "You are a research assistant. Identify the 'References' or 'Bibliography' section in the text provided. Extract the full citations. Return them as a clean list separated by newlines. Do not number the lines." 
-        },
-        { 
-          role: "user", 
-          content: `Extract the full references list from the end of this document:\n\n${truncateText(text)}` 
-        }
-      ],
-    });
-
-    const content = response.choices[0].message.content || "";
-    
-    const citationsList = content.split("\n")
-      .map(line => line.trim())
-      .filter(line => line.length > 5) // Filter out short noise like "References" or "Page 2"
-      .map(line => line.replace(/^\d+[\.\)]\s*/, '')); // 🟢 FIX: Remove "1." or "1)" from start
-
-    if (citationsList.length === 0) {
-      return ["No bibliography found in the scanned text."];
+  const response = await createChatCompletion([
+    {
+      role: "system",
+      content: "You are a research assistant. Identify the 'References' or 'Bibliography' section in the text provided. Extract the full citations. Return them as a clean list separated by newlines. Do not number the lines."
+    },
+    {
+      role: "user",
+      content: `Extract the full references list from the end of this document:\n\n${truncateText(text)}`
     }
+  ]);
 
-    return citationsList;
+  const content = response.choices[0].message.content || "";
+  const citationsList = content.split("\n")
+    .map(line => line.trim())
+    .filter(line => line.length > 5)
+    .map(line => line.replace(/^\d+[\.\)]\s*/, ""));
 
-  } catch (error) {
-    console.error("Groq Citations Error:", error);
-    return ["Error extracting citations."];
-  }
+  return citationsList.length > 0
+    ? citationsList
+    : ["No bibliography found in the scanned text."];
 }
 
 export async function generateParaphrase(text: string) {
-  try {
-    const response = await openai.chat.completions.create({
-      model: "llama-3.1-8b-instant",
-      messages: [
-        { role: "system", content: "Rewrite the text in an academic tone." },
-        { role: "user", content: `Paraphrase this:\n\n${truncateText(text, 2000)}` }
-      ],
-    });
-    return response.choices[0].message.content || "Paraphrase unavailable.";
-  } catch (error) {
-    console.error("Groq Paraphrase Error:", error);
-    return "Error generating paraphrase.";
-  }
+  const response = await createChatCompletion([
+    { role: "system", content: "Rewrite the text in an academic tone." },
+    { role: "user", content: `Paraphrase this:\n\n${truncateText(text, 2000)}` }
+  ]);
+  return response.choices[0].message.content || "Paraphrase unavailable.";
 }
 
-// ⚠️ THIS IS THE FIX FOR YOUR CURRENT ERROR ⚠️
 export async function calculatePlagiarismScore(text: string) {
-  try {
-    const response = await openai.chat.completions.create({
-      model: "llama-3.1-8b-instant",
-      messages: [
-        { role: "system", content: "You are a plagiarism detector. Return ONLY a number between 0 and 100 representing the plagiarism risk. Do not write any words, just the number." },
-        { role: "user", content: `Analyze this text:\n\n${truncateText(text, 2000)}` }
-      ],
-    });
+  const response = await createChatCompletion([
+    { role: "system", content: "You are a plagiarism detector. Return ONLY a number between 0 and 100 representing the plagiarism risk. Do not write any words, just the number." },
+    { role: "user", content: `Analyze this text:\n\n${truncateText(text, 2000)}` }
+  ]);
 
-    const content = response.choices[0].message.content || "0";
-    
-    // Parse the number from the string (e.g. "85%" -> 85)
-    const match = content.match(/(\d+(\.\d+)?)/);
-    const score = match ? parseFloat(match[0]) : 0;
-    
-    // Return a NUMBER (Fixes .toFixed error)
-    return score;
-
-  } catch (error) {
-    console.error("Groq Plagiarism Error:", error);
-    return 0; // Return 0 on error so the app doesn't crash
+  const content = response.choices[0].message.content || "";
+  const match = content.match(/(\d+(\.\d+)?)/);
+  if (!match) {
+    throw new Error("The AI service returned an invalid plagiarism score.");
   }
+  return Math.min(100, Math.max(0, parseFloat(match[0])));
 }
 
 export async function generateTTS(text: string): Promise<Buffer> {

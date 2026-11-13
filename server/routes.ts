@@ -37,11 +37,6 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 // THIS IS THE MISSING EXPORT
 export async function registerRoutes(app: Express): Promise<Server> {
   
-  // Generic API Key check
-  if (!process.env.OPENAI_API_KEY && !process.env.GROQ_API_KEY) {
-    console.error("❌ No API Key set. AI features will fail.");
-  }
-
   app.post("/api/upload", upload.single("file"), async (req, res) => {
     try {
       if (!req.file) return res.status(400).send("No file uploaded");
@@ -70,8 +65,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ... inside server/routes.ts ...
 
   app.post("/api/analyze", async (req, res) => {
+    let documentId: string | undefined;
     try {
       const validatedData = analyzeDocumentSchema.parse(req.body);
+      documentId = validatedData.documentId;
       const document = await storage.getDocument(validatedData.documentId);
 
       if (!document) return res.status(404).send("Document not found");
@@ -94,10 +91,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           generateSummary(textStart)
             .then((result) => {
               analysis.summary = result;
-            })
-            .catch((error) => {
-              console.error("Summary generation failed:", error);
-              analysis.summary = "Summary unavailable.";
             }),
         );
       }
@@ -108,10 +101,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           extractCitations(textEnd)
             .then((result) => {
               analysis.citations = result;
-            })
-            .catch((error) => {
-              console.error("Citation extraction failed:", error);
-              analysis.citations = ["No citations found."];
             }),
         );
       }
@@ -122,10 +111,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           generateParaphrase(textStart)
             .then((result) => {
               analysis.paraphrase = result;
-            })
-            .catch((error) => {
-              console.error("Paraphrase generation failed:", error);
-              analysis.paraphrase = "Paraphrase unavailable.";
             }),
         );
       }
@@ -136,10 +121,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           calculatePlagiarismScore(textStart)
             .then((result) => {
               analysis.plagiarismScore = result;
-            })
-            .catch((error) => {
-              console.error("Plagiarism check failed:", error);
-              analysis.plagiarismScore = 0;
             }),
         );
       }
@@ -154,6 +135,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedDocument);
     } catch (error: any) {
       console.error("Analysis error:", error);
+      if (documentId) {
+        try {
+          await storage.updateDocumentStatus(documentId, "failed");
+        } catch (statusError) {
+          console.error("Failed to mark document analysis as failed:", statusError);
+        }
+      }
+      const connectionCode = error?.code ?? error?.cause?.code;
+      if (
+        connectionCode === "ECONNREFUSED" ||
+        connectionCode === "ECONNRESET"
+      ) {
+        return res.status(503).json({
+          error: "Could not connect to the Gemini API. Check your internet connection and try again.",
+        });
+      }
       if (error?.status === 429) {
          return res.status(429).json({ error: "AI Service Busy. Please wait a moment." });
       }

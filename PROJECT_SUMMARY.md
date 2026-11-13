@@ -2,7 +2,7 @@
 
 ## 📋 Project Overview
 
-**PaperMind AI** is a full-featured, production-ready research paper analysis platform built with modern web technologies. It enables users to upload academic PDFs and receive AI-powered insights powered by OpenAI's GPT-5 model.
+**PaperMind AI** is a research paper analysis platform built with modern web technologies. It enables users to upload academic PDFs and receive AI-powered insights using Google's Gemini API.
 
 **Status:** ✅ COMPLETE AND FULLY FUNCTIONAL
 **Current State:** Running successfully on http://localhost:5000
@@ -27,12 +27,12 @@
 - Status tracking (uploading, processing, completed, failed)
 
 ### 3. **AI-Powered Analysis** ✅
-Powered by OpenAI GPT-5:
+Powered by Google Gemini:
 - **Smart Summaries** - Concise academic summaries focusing on findings, methodology, conclusions
 - **Citation Extraction** - Automatically extract and format citations in JSON format
 - **Paraphrasing** - Academic rewording maintaining original meaning
 - **Plagiarism Detection** - AI-based plagiarism scoring (0-100%)
-- **Text-to-Speech** - Convert text to natural audio using OpenAI TTS
+- **Text-to-Speech** - Convert text to speech using the existing Google Translate TTS integration
 
 ### 4. **Dashboard & Analytics** ✅
 - Statistics overview (total documents, analyses, etc.)
@@ -82,7 +82,7 @@ React 18 + TypeScript
 Express.js + TypeScript
 ├── Multer (file upload)
 ├── pdf-parse (PDF text extraction)
-├── OpenAI SDK (AI integration)
+├── OpenAI-compatible SDK connected to the Gemini API
 ├── Firebase Admin SDK (Firestore)
 ├── Drizzle ORM (database)
 └── Zod (validation)
@@ -172,7 +172,7 @@ PaperMind-AI/
 - Node.js 18+
 - npm or yarn
 - Firebase account (free tier works!)
-- OpenAI API account (free trial available)
+- Google AI Studio account for a Gemini API key (free-tier usage limits apply)
 
 ### **Step 1: Install Dependencies**
 ```bash
@@ -204,8 +204,9 @@ FIREBASE_PROJECT_ID=your_project_id
 FIREBASE_CLIENT_EMAIL=your_service_account_email
 FIREBASE_PRIVATE_KEY=your_private_key
 
-# OpenAI
-OPENAI_API_KEY=your_openai_api_key
+# Gemini
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-3.1-flash-lite
 ```
 
 ### **Step 4: Run Development Server**
@@ -245,7 +246,7 @@ Dashboard (fetch documents)
         ↓
 Upload PDF → Extract Text → Store in Firestore
         ↓
-Click Analyze → Send to OpenAI GPT-5
+Click Analyze → Send document text to Google Gemini
         ↓
 Receive Results → Store Analysis → Display to User
         ↓
@@ -311,7 +312,7 @@ npm run test:e2e
 |-------|----------|
 | Firebase not configured | Add credentials to `.env.local`, restart `npm run dev` |
 | PDF upload fails | Check file size (<10MB), ensure valid PDF |
-| AI features not working | Verify OpenAI API key, check account has credits |
+| AI features not working | Verify `GEMINI_API_KEY` and check current Gemini API limits |
 | Dark mode not working | Clear localStorage, hard refresh browser |
 | Build fails | Delete `node_modules`, run `npm install` again |
 
@@ -376,7 +377,7 @@ Your **PaperMind AI** application is:
 - ✅ Well-documented with setup guides
 - ✅ Secured with Firebase Auth
 
-Simply add your Firebase and OpenAI credentials, and you're ready to analyze research papers with AI! 🚀
+Add your Firebase credentials and Gemini API key to analyze research papers with AI. Gemini's free-tier limits apply, and document text is sent to Google's API.
 
 ---
 

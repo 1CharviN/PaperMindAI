@@ -6,12 +6,12 @@ An intelligent, full-featured research paper analysis platform with Firebase Aut
 
 - **🔐 Firebase Authentication** - Email/password and Google sign-in
 - **📄 PDF Upload** - Drag-and-drop PDF upload with automatic text extraction
-- **🤖 AI-Powered Analysis** - Powered by OpenAI GPT-5:
+- **🤖 AI-Powered Analysis** - Powered by Google Gemini:
   - Smart summaries of research papers
   - Citation extraction and formatting
   - Academic paraphrasing
   - Plagiarism detection
-- **🎵 Text-to-Speech** - Listen to papers with OpenAI TTS
+- **🎵 Text-to-Speech** - Listen to papers with Google Translate TTS
 - **📊 Document History** - Search, manage, and organize your research
 - **🌙 Dark Mode** - Full dark/light mode support
 - **🌍 Multi-Language** - English, Hindi, Kannada, Telugu and Tamil
@@ -47,8 +47,10 @@ FIREBASE_PROJECT_ID=your_project_id
 FIREBASE_CLIENT_EMAIL=your_service_account_email
 FIREBASE_PRIVATE_KEY=your_private_key
 
-# OpenAI API
-OPENAI_API_KEY=your_openai_api_key
+# Gemini API (get a key at https://aistudio.google.com/apikey)
+GEMINI_API_KEY=your_gemini_api_key
+# Optional model override (defaults to gemini-3.1-flash-lite)
+GEMINI_MODEL=gemini-3.1-flash-lite
 ```
 
 ### 3. Run the App
@@ -56,6 +58,9 @@ OPENAI_API_KEY=your_openai_api_key
 npm run dev
 ```
 Visit `http://localhost:5000`
+
+### Set up Gemini
+Create a Gemini API key in [Google AI Studio](https://aistudio.google.com/apikey) and add it as `GEMINI_API_KEY` in `.env.local`. Gemini's free tier has usage limits that can change; check [current pricing and limits](https://ai.google.dev/gemini-api/docs/pricing). Requests send document text to Google's API, so avoid sending sensitive documents unless that is appropriate for your use.
 
 ## 📁 Project Structure
 
@@ -70,7 +75,7 @@ Visit `http://localhost:5000`
 ├── server/
 │   ├── routes.ts           # API endpoints
 │   ├── storage.ts          # Data storage logic
-│   ├── openai.ts           # AI integration
+│   ├── openai.ts           # Gemini integration and text-to-speech
 │   └── firebase.ts         # Firebase initialization
 ├── shared/
 │   └── schema.ts           # TypeScript types & Zod schemas
@@ -100,7 +105,7 @@ Visit `http://localhost:5000`
 - Express.js
 - TypeScript
 - Firebase Admin SDK
-- OpenAI API
+- Google Gemini API
 - Multer for file uploads
 - pdf-parse for PDF extraction
 
@@ -141,9 +146,9 @@ Remember to set all environment variables in your hosting provider's dashboard.
 - Check browser console for detailed error
 
 **AI features not working**
-- Verify `OPENAI_API_KEY` is set in `.env.local`
-- Check your OpenAI account has credits
-- Review API key hasn't been disabled
+- Make sure `GEMINI_API_KEY` is set in `.env.local` and restart the app.
+- Check that your Gemini API key is valid and that you have not exceeded the free-tier limits.
+- If you use another model, set `GEMINI_MODEL` in `.env.local`.
 
 ## 📖 Documentation
 
