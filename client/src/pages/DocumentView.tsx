@@ -30,7 +30,7 @@ export default function DocumentView() {
   const queryClient = useQueryClient();
   const [selectedTab, setSelectedTab] = useState("summary");
 
-  const { data: document, isLoading } = useQuery<DocumentWithAnalysis>({
+  const { data: document, isLoading, isError, error, refetch } = useQuery<DocumentWithAnalysis>({
     queryKey: ["/api/documents", id],
     enabled: !!id,
   });
@@ -130,11 +130,19 @@ export default function DocumentView() {
   }
 
   if (!document) {
+    const notFound = isError && error instanceof Error && error.message.startsWith("404:");
     return (
       <Card>
         <CardContent className="p-12 text-center">
           <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium mb-2">{t("documentNotFound")}</h3>
+          <h3 className="text-lg font-medium mb-2">
+            {notFound ? t("documentNotFound") : t("failedToLoadDocuments")}
+          </h3>
+          {isError && !notFound && (
+            <Button variant="outline" className="mr-2" onClick={() => refetch()}>
+              {t("retry")}
+            </Button>
+          )}
           <Button onClick={() => setLocation("/history")}>{t("goToHistory")}</Button>
         </CardContent>
       </Card>

@@ -145,6 +145,7 @@ var initializeFirebase = () => {
 };
 var app = initializeFirebase();
 var db = app ? admin.firestore() : null;
+var auth = app ? admin.auth(app) : null;
 var COLLECTIONS = {
   DOCUMENTS: "documents",
   ANALYSES: "analyses"
@@ -184,33 +185,37 @@ var HybridStorage = class {
     return user;
   }
   // Document operations (Firebase Firestore)
-  async getDocument(id) {
+  async getDocument(id, ownerId) {
     if (!db) return void 0;
     const docRef = db.collection(COLLECTIONS.DOCUMENTS).doc(id);
     const doc = await docRef.get();
     if (!doc.exists) return void 0;
-    const docData = doc.data();
+    const storedDocument = doc.data();
+    if (storedDocument.ownerId !== ownerId) return void 0;
     const analysisRef = db.collection(COLLECTIONS.ANALYSES).doc(id);
     const analysisDoc = await analysisRef.get();
     const analysis = analysisDoc.exists ? analysisDoc.data() : void 0;
+    const { ownerId: _ownerId, ...docData } = storedDocument;
     return { ...docData, id: doc.id, analysis };
   }
-  async getAllDocuments() {
+  async getAllDocuments(ownerId) {
     if (!db) return [];
     const firestoreDb = db;
-    const snapshot = await firestoreDb.collection(COLLECTIONS.DOCUMENTS).orderBy("uploadedAt", "desc").get();
+    const snapshot = await firestoreDb.collection(COLLECTIONS.DOCUMENTS).where("ownerId", "==", ownerId).get();
     const documents = await Promise.all(
       snapshot.docs.map(async (doc) => {
-        const docData = doc.data();
+        const { ownerId: _ownerId, ...docData } = doc.data();
         const analysisRef = firestoreDb.collection(COLLECTIONS.ANALYSES).doc(doc.id);
         const analysisDoc = await analysisRef.get();
         const analysis = analysisDoc.exists ? analysisDoc.data() : void 0;
         return { ...docData, id: doc.id, analysis };
       })
     );
-    return documents;
+    return documents.sort(
+      (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+    );
   }
-  async createDocument(insertDoc) {
+  async createDocument(insertDoc, ownerId) {
     if (!db) throw new Error("Firestore not initialized");
     const id = nanoid();
     const document = {
@@ -219,20 +224,31 @@ var HybridStorage = class {
       uploadedAt: (/* @__PURE__ */ new Date()).toISOString(),
       status: "processing"
     };
-    await db.collection(COLLECTIONS.DOCUMENTS).doc(id).set(document);
+    await db.collection(COLLECTIONS.DOCUMENTS).doc(id).set({ ...document, ownerId });
     return document;
   }
-  async updateDocumentStatus(id, status) {
+  async updateDocumentStatus(id, status, ownerId) {
     if (!db) return;
-    await db.collection(COLLECTIONS.DOCUMENTS).doc(id).update({ status });
+    const documentRef = db.collection(COLLECTIONS.DOCUMENTS).doc(id);
+    const document = await documentRef.get();
+    if (document.data()?.ownerId === ownerId) {
+      await documentRef.update({ status });
+    }
   }
-  async deleteDocument(id) {
-    if (!db) return;
-    await db.collection(COLLECTIONS.DOCUMENTS).doc(id).delete();
+  async deleteDocument(id, ownerId) {
+    if (!db) return false;
+    const documentRef = db.collection(COLLECTIONS.DOCUMENTS).doc(id);
+    const document = await documentRef.get();
+    if (!document.exists || document.data()?.ownerId !== ownerId) return false;
+    await documentRef.delete();
     await db.collection(COLLECTIONS.ANALYSES).doc(id).delete();
+    return true;
   }
-  async saveAnalysis(documentId, analysis) {
+  async saveAnalysis(documentId, analysis, ownerId) {
     if (!db) return;
+    if (!await this.getDocument(documentId, ownerId)) {
+      throw new Error("Document not found");
+    }
     const analysisRef = db.collection(COLLECTIONS.ANALYSES).doc(documentId);
     const existing = await analysisRef.get();
     if (existing.exists) {
@@ -241,18 +257,20 @@ var HybridStorage = class {
       await analysisRef.set(analysis);
     }
   }
-  async saveTTSAudio(documentId, audioUrl) {
+  async saveTTSAudio(documentId, audioUrl, ownerId) {
     if (!db) return;
-    await this.saveAnalysis(documentId, { ttsAudioUrl: audioUrl });
+    await this.saveAnalysis(documentId, { ttsAudioUrl: audioUrl }, ownerId);
   }
 };
 var MemStorage = class {
   documents;
   analyses;
+  documentOwners;
   usersMap;
   constructor() {
     this.documents = /* @__PURE__ */ new Map();
     this.analyses = /* @__PURE__ */ new Map();
+    this.documentOwners = /* @__PURE__ */ new Map();
     this.usersMap = /* @__PURE__ */ new Map();
   }
   // User operations (in-memory)
@@ -272,20 +290,22 @@ var MemStorage = class {
     this.usersMap.set(user.id, user);
     return user;
   }
-  async getDocument(id) {
+  async getDocument(id, ownerId) {
     const doc = this.documents.get(id);
-    if (!doc) return void 0;
+    if (!doc || this.documentOwners.get(id) !== ownerId) return void 0;
     const analysis = this.analyses.get(id);
     return { ...doc, analysis };
   }
-  async getAllDocuments() {
-    const docs = Array.from(this.documents.values());
+  async getAllDocuments(ownerId) {
+    const docs = Array.from(this.documents.values()).filter(
+      (doc) => this.documentOwners.get(doc.id) === ownerId
+    );
     return docs.map((doc) => ({
       ...doc,
       analysis: this.analyses.get(doc.id)
     })).sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
   }
-  async createDocument(insertDoc) {
+  async createDocument(insertDoc, ownerId) {
     const id = nanoid();
     const document = {
       ...insertDoc,
@@ -294,23 +314,33 @@ var MemStorage = class {
       status: "processing"
     };
     this.documents.set(id, document);
+    this.documentOwners.set(id, ownerId);
     return document;
   }
-  async updateDocumentStatus(id, status) {
+  async updateDocumentStatus(id, status, ownerId) {
     const doc = this.documents.get(id);
-    if (doc) {
+    if (doc && this.documentOwners.get(id) === ownerId) {
       this.documents.set(id, { ...doc, status });
     }
   }
-  async deleteDocument(id) {
-    this.documents.delete(id);
+  async deleteDocument(id, ownerId) {
+    if (this.documentOwners.get(id) !== ownerId) return false;
+    const deleted = this.documents.delete(id);
+    this.documentOwners.delete(id);
     this.analyses.delete(id);
+    return deleted;
   }
-  async saveAnalysis(documentId, analysis) {
+  async saveAnalysis(documentId, analysis, ownerId) {
+    if (this.documentOwners.get(documentId) !== ownerId) {
+      throw new Error("Document not found");
+    }
     const existing = this.analyses.get(documentId) || {};
     this.analyses.set(documentId, { ...existing, ...analysis });
   }
-  async saveTTSAudio(documentId, audioUrl) {
+  async saveTTSAudio(documentId, audioUrl, ownerId) {
+    if (this.documentOwners.get(documentId) !== ownerId) {
+      throw new Error("Document not found");
+    }
     const existing = this.analyses.get(documentId) || {};
     this.analyses.set(documentId, { ...existing, ttsAudioUrl: audioUrl });
   }
@@ -433,9 +463,28 @@ var upload = multer({
     }
   }
 });
+async function requireFirebaseAuth(req, res, next) {
+  if (!auth) {
+    return res.status(503).json({ error: "Firebase authentication is not configured." });
+  }
+  const token = req.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1];
+  if (!token) {
+    return res.status(401).json({ error: "Authentication required." });
+  }
+  try {
+    const decodedToken = await auth.verifyIdToken(token);
+    req.firebaseUid = decodedToken.uid;
+    next();
+  } catch {
+    return res.status(401).json({ error: "Invalid or expired authentication token." });
+  }
+}
 async function registerRoutes(app3) {
+  app3.use("/api", requireFirebaseAuth);
   app3.post("/api/upload", upload.single("file"), async (req, res) => {
     try {
+      const ownerId = req.firebaseUid;
+      if (!ownerId) return res.status(401).send("Authentication required");
       if (!req.file) return res.status(400).send("No file uploaded");
       if (typeof pdfParse !== "function") throw new Error("pdf-parse library error");
       const pdfData = await pdfParse(req.file.buffer);
@@ -447,7 +496,7 @@ async function registerRoutes(app3) {
         extractedText,
         language: "en"
       });
-      const document = await storage.createDocument(validatedData);
+      const document = await storage.createDocument(validatedData, ownerId);
       res.json(document);
     } catch (error) {
       console.error("Upload error:", error);
@@ -456,12 +505,14 @@ async function registerRoutes(app3) {
   });
   app3.post("/api/analyze", async (req, res) => {
     let documentId;
+    const ownerId = req.firebaseUid;
+    if (!ownerId) return res.status(401).send("Authentication required");
     try {
       const validatedData = analyzeDocumentSchema.parse(req.body);
       documentId = validatedData.documentId;
-      const document = await storage.getDocument(validatedData.documentId);
+      const document = await storage.getDocument(validatedData.documentId, ownerId);
       if (!document) return res.status(404).send("Document not found");
-      await storage.updateDocumentStatus(validatedData.documentId, "processing");
+      await storage.updateDocumentStatus(validatedData.documentId, "processing", ownerId);
       const startTime = Date.now();
       const operations = validatedData.operations;
       const analysis = {};
@@ -502,15 +553,15 @@ async function registerRoutes(app3) {
       }
       await Promise.all(tasks);
       analysis.processingTime = (Date.now() - startTime) / 1e3;
-      await storage.saveAnalysis(validatedData.documentId, analysis);
-      await storage.updateDocumentStatus(validatedData.documentId, "completed");
-      const updatedDocument = await storage.getDocument(validatedData.documentId);
+      await storage.saveAnalysis(validatedData.documentId, analysis, ownerId);
+      await storage.updateDocumentStatus(validatedData.documentId, "completed", ownerId);
+      const updatedDocument = await storage.getDocument(validatedData.documentId, ownerId);
       res.json(updatedDocument);
     } catch (error) {
       console.error("Analysis error:", error);
       if (documentId) {
         try {
-          await storage.updateDocumentStatus(documentId, "failed");
+          await storage.updateDocumentStatus(documentId, "failed", ownerId);
         } catch (statusError) {
           console.error("Failed to mark document analysis as failed:", statusError);
         }
@@ -529,14 +580,16 @@ async function registerRoutes(app3) {
   });
   app3.post("/api/tts", async (req, res) => {
     try {
+      const ownerId = req.firebaseUid;
+      if (!ownerId) return res.status(401).send("Authentication required");
       const validatedData = generateTTSSchema.parse(req.body);
-      const document = await storage.getDocument(validatedData.documentId);
+      const document = await storage.getDocument(validatedData.documentId, ownerId);
       if (!document) return res.status(404).send("Document not found");
       const audioBuffer = await generateTTS(validatedData.text);
       const base64Audio = audioBuffer.toString("base64");
       const audioUrl = `data:audio/mp3;base64,${base64Audio}`;
-      await storage.saveTTSAudio(validatedData.documentId, audioUrl);
-      const updatedDocument = await storage.getDocument(validatedData.documentId);
+      await storage.saveTTSAudio(validatedData.documentId, audioUrl, ownerId);
+      const updatedDocument = await storage.getDocument(validatedData.documentId, ownerId);
       res.json(updatedDocument);
     } catch (error) {
       console.error("TTS route error:", error);
@@ -544,16 +597,23 @@ async function registerRoutes(app3) {
     }
   });
   app3.get("/api/documents", async (req, res) => {
-    const documents = await storage.getAllDocuments();
+    const ownerId = req.firebaseUid;
+    if (!ownerId) return res.status(401).send("Authentication required");
+    const documents = await storage.getAllDocuments(ownerId);
     res.json(documents);
   });
   app3.get("/api/documents/:id", async (req, res) => {
-    const document = await storage.getDocument(req.params.id);
+    const ownerId = req.firebaseUid;
+    if (!ownerId) return res.status(401).send("Authentication required");
+    const document = await storage.getDocument(req.params.id, ownerId);
     if (!document) return res.status(404).send("Document not found");
     res.json(document);
   });
   app3.delete("/api/documents/:id", async (req, res) => {
-    await storage.deleteDocument(req.params.id);
+    const ownerId = req.firebaseUid;
+    if (!ownerId) return res.status(401).send("Authentication required");
+    const deleted = await storage.deleteDocument(req.params.id, ownerId);
+    if (!deleted) return res.status(404).send("Document not found");
     res.json({ success: true });
   });
   const httpServer = createServer(app3);

@@ -49,6 +49,7 @@ const initializeFirebase = () => {
 
 const app = initializeFirebase();
 export const db = app ? admin.firestore() : null;
+export const auth = app ? admin.auth(app) : null;
 
 // Collection names
 export const COLLECTIONS = {

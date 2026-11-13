@@ -11,15 +11,15 @@ export interface IStorage {
   upsertUser(user: UpsertUser): Promise<User>;
   
   // Document operations (uses Firebase Firestore)
-  getDocument(id: string): Promise<(Document & { analysis?: DocumentAnalysis }) | undefined>;
-  getAllDocuments(): Promise<(Document & { analysis?: DocumentAnalysis })[]>;
-  createDocument(doc: InsertDocument): Promise<Document>;
-  updateDocumentStatus(id: string, status: Document["status"]): Promise<void>;
-  deleteDocument(id: string): Promise<void>;
+  getDocument(id: string, ownerId: string): Promise<(Document & { analysis?: DocumentAnalysis }) | undefined>;
+  getAllDocuments(ownerId: string): Promise<(Document & { analysis?: DocumentAnalysis })[]>;
+  createDocument(doc: InsertDocument, ownerId: string): Promise<Document>;
+  updateDocumentStatus(id: string, status: Document["status"], ownerId: string): Promise<void>;
+  deleteDocument(id: string, ownerId: string): Promise<boolean>;
   
   // Analysis operations (uses Firebase Firestore)
-  saveAnalysis(documentId: string, analysis: Partial<DocumentAnalysis>): Promise<void>;
-  saveTTSAudio(documentId: string, audioUrl: string): Promise<void>;
+  saveAnalysis(documentId: string, analysis: Partial<DocumentAnalysis>, ownerId: string): Promise<void>;
+  saveTTSAudio(documentId: string, audioUrl: string, ownerId: string): Promise<void>;
 }
 
 // Hybrid storage implementation (PostgreSQL for users, Firebase for documents)
@@ -46,7 +46,7 @@ export class HybridStorage implements IStorage {
   }
 
   // Document operations (Firebase Firestore)
-  async getDocument(id: string): Promise<(Document & { analysis?: DocumentAnalysis }) | undefined> {
+  async getDocument(id: string, ownerId: string): Promise<(Document & { analysis?: DocumentAnalysis }) | undefined> {
     if (!firebaseDb) return undefined;
 
     const docRef = firebaseDb.collection(COLLECTIONS.DOCUMENTS).doc(id);
@@ -54,27 +54,29 @@ export class HybridStorage implements IStorage {
     
     if (!doc.exists) return undefined;
 
-    const docData = doc.data() as Document;
+    const storedDocument = doc.data() as Document & { ownerId?: string };
+    if (storedDocument.ownerId !== ownerId) return undefined;
 
     // Get analysis if exists
     const analysisRef = firebaseDb.collection(COLLECTIONS.ANALYSES).doc(id);
     const analysisDoc = await analysisRef.get();
     const analysis = analysisDoc.exists ? (analysisDoc.data() as DocumentAnalysis) : undefined;
 
+    const { ownerId: _ownerId, ...docData } = storedDocument;
     return { ...docData, id: doc.id, analysis };
   }
 
-  async getAllDocuments(): Promise<(Document & { analysis?: DocumentAnalysis })[]> {
+  async getAllDocuments(ownerId: string): Promise<(Document & { analysis?: DocumentAnalysis })[]> {
     if (!firebaseDb) return [];
 
     const firestoreDb = firebaseDb;
     const snapshot = await firestoreDb.collection(COLLECTIONS.DOCUMENTS)
-      .orderBy("uploadedAt", "desc")
+      .where("ownerId", "==", ownerId)
       .get();
 
     const documents = await Promise.all(
       snapshot.docs.map(async (doc) => {
-        const docData = doc.data() as Document;
+        const { ownerId: _ownerId, ...docData } = doc.data() as Document & { ownerId?: string };
         
         // Get analysis if exists
         const analysisRef = firestoreDb.collection(COLLECTIONS.ANALYSES).doc(doc.id);
@@ -85,10 +87,12 @@ export class HybridStorage implements IStorage {
       })
     );
 
-    return documents;
+    return documents.sort(
+      (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
+    );
   }
 
-  async createDocument(insertDoc: InsertDocument): Promise<Document> {
+  async createDocument(insertDoc: InsertDocument, ownerId: string): Promise<Document> {
     if (!firebaseDb) throw new Error("Firestore not initialized");
 
     const id = nanoid();
@@ -99,28 +103,38 @@ export class HybridStorage implements IStorage {
       status: "processing",
     };
 
-    await firebaseDb.collection(COLLECTIONS.DOCUMENTS).doc(id).set(document);
+    await firebaseDb.collection(COLLECTIONS.DOCUMENTS).doc(id).set({ ...document, ownerId });
     return document;
   }
 
-  async updateDocumentStatus(id: string, status: Document["status"]): Promise<void> {
+  async updateDocumentStatus(id: string, status: Document["status"], ownerId: string): Promise<void> {
     if (!firebaseDb) return;
 
-    await firebaseDb.collection(COLLECTIONS.DOCUMENTS).doc(id).update({ status });
+    const documentRef = firebaseDb.collection(COLLECTIONS.DOCUMENTS).doc(id);
+    const document = await documentRef.get();
+    if (document.data()?.ownerId === ownerId) {
+      await documentRef.update({ status });
+    }
   }
 
-  async deleteDocument(id: string): Promise<void> {
-    if (!firebaseDb) return;
+  async deleteDocument(id: string, ownerId: string): Promise<boolean> {
+    if (!firebaseDb) return false;
 
-    // Delete document
-    await firebaseDb.collection(COLLECTIONS.DOCUMENTS).doc(id).delete();
+    const documentRef = firebaseDb.collection(COLLECTIONS.DOCUMENTS).doc(id);
+    const document = await documentRef.get();
+    if (!document.exists || document.data()?.ownerId !== ownerId) return false;
+
+    await documentRef.delete();
     
-    // Delete analysis
     await firebaseDb.collection(COLLECTIONS.ANALYSES).doc(id).delete();
+    return true;
   }
 
-  async saveAnalysis(documentId: string, analysis: Partial<DocumentAnalysis>): Promise<void> {
+  async saveAnalysis(documentId: string, analysis: Partial<DocumentAnalysis>, ownerId: string): Promise<void> {
     if (!firebaseDb) return;
+    if (!(await this.getDocument(documentId, ownerId))) {
+      throw new Error("Document not found");
+    }
 
     const analysisRef = firebaseDb.collection(COLLECTIONS.ANALYSES).doc(documentId);
     const existing = await analysisRef.get();
@@ -132,10 +146,10 @@ export class HybridStorage implements IStorage {
     }
   }
 
-  async saveTTSAudio(documentId: string, audioUrl: string): Promise<void> {
+  async saveTTSAudio(documentId: string, audioUrl: string, ownerId: string): Promise<void> {
     if (!firebaseDb) return;
 
-    await this.saveAnalysis(documentId, { ttsAudioUrl: audioUrl });
+    await this.saveAnalysis(documentId, { ttsAudioUrl: audioUrl }, ownerId);
   }
 }
 
@@ -143,11 +157,13 @@ export class HybridStorage implements IStorage {
 export class MemStorage implements IStorage {
   private documents: Map<string, Document>;
   private analyses: Map<string, DocumentAnalysis>;
+  private documentOwners: Map<string, string>;
   private usersMap: Map<string, User>;
 
   constructor() {
     this.documents = new Map();
     this.analyses = new Map();
+    this.documentOwners = new Map();
     this.usersMap = new Map();
   }
 
@@ -170,23 +186,25 @@ export class MemStorage implements IStorage {
     return user;
   }
 
-  async getDocument(id: string): Promise<(Document & { analysis?: DocumentAnalysis }) | undefined> {
+  async getDocument(id: string, ownerId: string): Promise<(Document & { analysis?: DocumentAnalysis }) | undefined> {
     const doc = this.documents.get(id);
-    if (!doc) return undefined;
+    if (!doc || this.documentOwners.get(id) !== ownerId) return undefined;
     
     const analysis = this.analyses.get(id);
     return { ...doc, analysis };
   }
 
-  async getAllDocuments(): Promise<(Document & { analysis?: DocumentAnalysis })[]> {
-    const docs = Array.from(this.documents.values());
+  async getAllDocuments(ownerId: string): Promise<(Document & { analysis?: DocumentAnalysis })[]> {
+    const docs = Array.from(this.documents.values()).filter(
+      (doc) => this.documentOwners.get(doc.id) === ownerId,
+    );
     return docs.map(doc => ({
       ...doc,
       analysis: this.analyses.get(doc.id),
     })).sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
   }
 
-  async createDocument(insertDoc: InsertDocument): Promise<Document> {
+  async createDocument(insertDoc: InsertDocument, ownerId: string): Promise<Document> {
     const id = nanoid();
     const document: Document = {
       ...insertDoc,
@@ -195,27 +213,37 @@ export class MemStorage implements IStorage {
       status: "processing",
     };
     this.documents.set(id, document);
+    this.documentOwners.set(id, ownerId);
     return document;
   }
 
-  async updateDocumentStatus(id: string, status: Document["status"]): Promise<void> {
+  async updateDocumentStatus(id: string, status: Document["status"], ownerId: string): Promise<void> {
     const doc = this.documents.get(id);
-    if (doc) {
+    if (doc && this.documentOwners.get(id) === ownerId) {
       this.documents.set(id, { ...doc, status });
     }
   }
 
-  async deleteDocument(id: string): Promise<void> {
-    this.documents.delete(id);
+  async deleteDocument(id: string, ownerId: string): Promise<boolean> {
+    if (this.documentOwners.get(id) !== ownerId) return false;
+    const deleted = this.documents.delete(id);
+    this.documentOwners.delete(id);
     this.analyses.delete(id);
+    return deleted;
   }
 
-  async saveAnalysis(documentId: string, analysis: Partial<DocumentAnalysis>): Promise<void> {
+  async saveAnalysis(documentId: string, analysis: Partial<DocumentAnalysis>, ownerId: string): Promise<void> {
+    if (this.documentOwners.get(documentId) !== ownerId) {
+      throw new Error("Document not found");
+    }
     const existing = this.analyses.get(documentId) || {};
     this.analyses.set(documentId, { ...existing, ...analysis });
   }
 
-  async saveTTSAudio(documentId: string, audioUrl: string): Promise<void> {
+  async saveTTSAudio(documentId: string, audioUrl: string, ownerId: string): Promise<void> {
+    if (this.documentOwners.get(documentId) !== ownerId) {
+      throw new Error("Document not found");
+    }
     const existing = this.analyses.get(documentId) || {};
     this.analyses.set(documentId, { ...existing, ttsAudioUrl: audioUrl });
   }

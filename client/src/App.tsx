@@ -91,6 +91,7 @@ function AuthenticatedApp({ style }: { style: any }) {
 
   const handleLogout = async () => {
     await logout();
+    queryClient.clear();
     setLocation("/login");
   };
 

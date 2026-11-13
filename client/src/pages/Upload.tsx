@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { getAuthToken } from "@/lib/firebaseAuth";
 import { useTranslation } from "react-i18next";
 
 export default function Upload() {
@@ -22,9 +23,11 @@ export default function Upload() {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
+      const token = await getAuthToken();
 
       const response = await fetch("/api/upload", {
         method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
 

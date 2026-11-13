@@ -28,7 +28,7 @@ export default function History() {
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const { data: documents, isLoading } = useQuery<DocumentWithAnalysis[]>({
+  const { data: documents, isLoading, isError, refetch } = useQuery<DocumentWithAnalysis[]>({
     queryKey: ["/api/documents"],
   });
 
@@ -89,6 +89,13 @@ export default function History() {
             </Card>
           ))}
         </div>
+      ) : isError ? (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <p className="text-muted-foreground mb-4">{t("failedToLoadDocuments")}</p>
+            <Button variant="outline" onClick={() => refetch()}>{t("retry")}</Button>
+          </CardContent>
+        </Card>
       ) : !filteredDocuments || filteredDocuments.length === 0 ? (
         <Card>
           <CardContent className="p-12 text-center">

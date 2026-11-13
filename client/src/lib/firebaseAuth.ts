@@ -63,5 +63,13 @@ export function onAuthChange(callback: (user: FirebaseUser | null) => void) {
   return onAuthStateChanged(auth, callback);
 }
 
+export async function getAuthToken() {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error("You must be signed in to access documents.");
+  }
+  return user.getIdToken();
+}
+
 export { auth };
 export type { FirebaseUser };

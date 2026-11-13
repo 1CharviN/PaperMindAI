@@ -11,7 +11,7 @@ import type { DocumentWithAnalysis } from "@shared/schema";
 export default function Dashboard() {
   const { t } = useTranslation();
 
-  const { data: documents, isLoading } = useQuery<DocumentWithAnalysis[]>({
+  const { data: documents, isLoading, isError, refetch } = useQuery<DocumentWithAnalysis[]>({
     queryKey: ["/api/documents"],
   });
 
@@ -23,11 +23,11 @@ export default function Dashboard() {
             new Date(doc.uploadedAt).toDateString() === new Date().toDateString()
         ).length
       : 0,
-    avgPlagiarism: documents
+    avgPlagiarism: documents?.length
       ? documents.reduce((acc, doc) => acc + (doc.analysis?.plagiarismScore || 0), 0) /
           documents.length
       : 0,
-    avgProcessingTime: documents
+    avgProcessingTime: documents?.length
       ? documents.reduce((acc, doc) => acc + (doc.analysis?.processingTime || 0), 0) /
           documents.length
       : 0,
@@ -57,6 +57,13 @@ export default function Dashboard() {
             </Card>
           ))}
         </div>
+      ) : isError ? (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <p className="text-muted-foreground mb-4">{t("failedToLoadDocuments")}</p>
+            <Button variant="outline" onClick={() => refetch()}>{t("retry")}</Button>
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           <StatsCard
@@ -107,7 +114,7 @@ export default function Dashboard() {
               </Card>
             ))}
           </div>
-        ) : recentDocuments.length === 0 ? (
+        ) : isError ? null : recentDocuments.length === 0 ? (
           <Card>
             <CardContent className="p-12 text-center">
               <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />

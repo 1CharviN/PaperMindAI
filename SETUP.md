@@ -75,6 +75,7 @@ The app will be available at `http://localhost:5000`
 5. In Firebase Console, add your deployed `*.vercel.app` hostname under **Authentication → Settings → Authorized domains**.
 
 The Vercel API function has a 60-second maximum duration. Vercel also limits request-body size, so use PDFs smaller than 4 MB with the current upload endpoint. This project needs Firebase Admin credentials and `DATABASE_URL` in Vercel; without them its server-side storage cannot initialize or persist documents correctly.
+All document API requests require a Firebase sign-in token, and new documents are private to the account that uploaded them. Existing Firestore documents without an `ownerId` are intentionally hidden until their ownership is explicitly assigned.
 
 ## Features
 
@@ -84,7 +85,7 @@ The Vercel API function has a 60-second maximum duration. Vercel also limits req
 ✅ **Plagiarism Detection** - AI-based plagiarism scoring
 ✅ **Text-to-Speech** - Listen to your papers with Google Translate TTS
 ✅ **Dark Mode** - Full dark/light mode support
-✅ **Multi-Language** - Support for EN, ES, FR, DE, ZH
+✅ **Multi-Language** - Support for English, Hindi, Kannada, Tamil, and Telugu
 ✅ **Document History** - Search and manage your documents
 
 ## Project Structure
@@ -112,7 +113,7 @@ The Vercel API function has a 60-second maximum duration. Vercel also limits req
 2. User signs up or logs in with email/password or Google
 3. Firebase handles authentication
 4. User accesses the dashboard
-5. All API calls are made from authenticated user's context
+5. The client sends a Firebase ID token with each API call, and the server scopes documents to that Firebase user
 6. Click logout to sign out
 
 ## Deployment

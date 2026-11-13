@@ -55,6 +55,8 @@
   "uploadedOnSize": "Uploaded {{date}} • {{size}} KB",
   "analysisCompletedSuccessfully": "Analysis completed successfully",
   "failedToAnalyzeDocument": "Failed to analyze document",
+  "failedToLoadDocuments": "Could not load documents. Check your connection and try again.",
+  "retry": "Retry",
   "analysisInProgress": "Analysis is running. This may take a few moments...",
   "audioGeneratedSuccessfully": "Audio generated successfully",
   "failedToGenerateAudio": "Failed to generate audio",

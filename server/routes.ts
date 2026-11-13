@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import type { NextFunction, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
 import { createRequire } from "module";
@@ -6,6 +7,7 @@ const require = createRequire(import.meta.url);
 const pdfParse = require("pdf-parse");
 
 import { storage } from "./storage";
+import { auth as firebaseAuth } from "./firebase";
 import {
   insertDocumentSchema,
   analyzeDocumentSchema,
@@ -32,13 +34,40 @@ const upload = multer({
   },
 });
 
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+declare global {
+  namespace Express {
+    interface Request {
+      firebaseUid?: string;
+    }
+  }
+}
 
-// THIS IS THE MISSING EXPORT
+async function requireFirebaseAuth(req: Request, res: Response, next: NextFunction) {
+  if (!firebaseAuth) {
+    return res.status(503).json({ error: "Firebase authentication is not configured." });
+  }
+
+  const token = req.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1];
+  if (!token) {
+    return res.status(401).json({ error: "Authentication required." });
+  }
+
+  try {
+    const decodedToken = await firebaseAuth.verifyIdToken(token);
+    req.firebaseUid = decodedToken.uid;
+    next();
+  } catch {
+    return res.status(401).json({ error: "Invalid or expired authentication token." });
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
-  
+  app.use("/api", requireFirebaseAuth);
+
   app.post("/api/upload", upload.single("file"), async (req, res) => {
     try {
+      const ownerId = req.firebaseUid;
+      if (!ownerId) return res.status(401).send("Authentication required");
       if (!req.file) return res.status(400).send("No file uploaded");
       if (typeof pdfParse !== "function") throw new Error("pdf-parse library error");
 
@@ -54,7 +83,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         language: "en",
       });
 
-      const document = await storage.createDocument(validatedData);
+      const document = await storage.createDocument(validatedData, ownerId);
       res.json(document);
     } catch (error: any) {
       console.error("Upload error:", error);
@@ -62,18 +91,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ... inside server/routes.ts ...
-
   app.post("/api/analyze", async (req, res) => {
     let documentId: string | undefined;
+    const ownerId = req.firebaseUid;
+    if (!ownerId) return res.status(401).send("Authentication required");
     try {
       const validatedData = analyzeDocumentSchema.parse(req.body);
       documentId = validatedData.documentId;
-      const document = await storage.getDocument(validatedData.documentId);
+      const document = await storage.getDocument(validatedData.documentId, ownerId);
 
       if (!document) return res.status(404).send("Document not found");
 
-      await storage.updateDocumentStatus(validatedData.documentId, "processing");
+      await storage.updateDocumentStatus(validatedData.documentId, "processing", ownerId);
 
       const startTime = Date.now();
       const operations = validatedData.operations;
@@ -128,16 +157,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await Promise.all(tasks);
 
       analysis.processingTime = (Date.now() - startTime) / 1000;
-      await storage.saveAnalysis(validatedData.documentId, analysis);
-      await storage.updateDocumentStatus(validatedData.documentId, "completed");
+      await storage.saveAnalysis(validatedData.documentId, analysis, ownerId);
+      await storage.updateDocumentStatus(validatedData.documentId, "completed", ownerId);
 
-      const updatedDocument = await storage.getDocument(validatedData.documentId);
+      const updatedDocument = await storage.getDocument(validatedData.documentId, ownerId);
       res.json(updatedDocument);
     } catch (error: any) {
       console.error("Analysis error:", error);
       if (documentId) {
         try {
-          await storage.updateDocumentStatus(documentId, "failed");
+          await storage.updateDocumentStatus(documentId, "failed", ownerId);
         } catch (statusError) {
           console.error("Failed to mark document analysis as failed:", statusError);
         }
@@ -160,16 +189,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.post("/api/tts", async (req, res) => {
     try {
+      const ownerId = req.firebaseUid;
+      if (!ownerId) return res.status(401).send("Authentication required");
       const validatedData = generateTTSSchema.parse(req.body);
-      const document = await storage.getDocument(validatedData.documentId);
+      const document = await storage.getDocument(validatedData.documentId, ownerId);
       if (!document) return res.status(404).send("Document not found");
 
       const audioBuffer = await generateTTS(validatedData.text);
       const base64Audio = audioBuffer.toString("base64");
       const audioUrl = `data:audio/mp3;base64,${base64Audio}`;
 
-      await storage.saveTTSAudio(validatedData.documentId, audioUrl);
-      const updatedDocument = await storage.getDocument(validatedData.documentId);
+      await storage.saveTTSAudio(validatedData.documentId, audioUrl, ownerId);
+      const updatedDocument = await storage.getDocument(validatedData.documentId, ownerId);
       res.json(updatedDocument);
     } catch (error: any) {
       console.error("TTS route error:", error);
@@ -178,18 +209,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/documents", async (req, res) => {
-    const documents = await storage.getAllDocuments();
+    const ownerId = req.firebaseUid;
+    if (!ownerId) return res.status(401).send("Authentication required");
+    const documents = await storage.getAllDocuments(ownerId);
     res.json(documents);
   });
 
   app.get("/api/documents/:id", async (req, res) => {
-    const document = await storage.getDocument(req.params.id);
+    const ownerId = req.firebaseUid;
+    if (!ownerId) return res.status(401).send("Authentication required");
+    const document = await storage.getDocument(req.params.id, ownerId);
     if (!document) return res.status(404).send("Document not found");
     res.json(document);
   });
 
   app.delete("/api/documents/:id", async (req, res) => {
-    await storage.deleteDocument(req.params.id);
+    const ownerId = req.firebaseUid;
+    if (!ownerId) return res.status(401).send("Authentication required");
+    const deleted = await storage.deleteDocument(req.params.id, ownerId);
+    if (!deleted) return res.status(404).send("Document not found");
     res.json({ success: true });
   });
 
