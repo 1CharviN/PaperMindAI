@@ -18,10 +18,25 @@ async function createChatCompletion(
     throw new Error("Gemini is not configured. Set GEMINI_API_KEY in the server environment.");
   }
 
-  return geminiClient.chat.completions.create({
-    model: geminiModel,
-    messages,
-  });
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await geminiClient.chat.completions.create({
+        model: geminiModel,
+        messages,
+      });
+    } catch (error) {
+      const status =
+        typeof error === "object" && error !== null && "status" in error
+          ? error.status
+          : undefined;
+      if (attempt !== 1 || status !== 503) {
+        throw error;
+      }
+
+      console.warn("Gemini returned 503; retrying once after a short delay.");
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
 }
 
 // Helper: Truncate text to avoid rate limits
