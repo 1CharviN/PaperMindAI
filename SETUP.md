@@ -70,6 +70,7 @@ The app will be available at `http://localhost:5000`
    - `VITE_FIREBASE_APP_ID`
 
    Paste the values into Vercel's environment-variable fields; never commit `.env.local`. `GEMINI_MODEL` is optional and defaults to `gemini-3.1-flash-lite`.
+   For `FIREBASE_PRIVATE_KEY`, copy the complete `private_key` value from your Firebase service-account JSON (including the `BEGIN PRIVATE KEY` and `END PRIVATE KEY` lines). In Vercel, paste the key value itself, without the `.env.local` variable name or extra quote characters.
 4. Deploy. When you change environment variables, redeploy so the frontend is rebuilt with the updated `VITE_FIREBASE_*` values.
 5. In Firebase Console, add your deployed `*.vercel.app` hostname under **Authentication → Settings → Authorized domains**.
 

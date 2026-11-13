@@ -1,4 +1,5 @@
 import admin from "firebase-admin";
+import { createPrivateKey } from "node:crypto";
 
 // Initialize Firebase Admin SDK
 // In production, use service account credentials
@@ -13,7 +14,23 @@ const initializeFirebase = () => {
   // For development: use a local emulator or in-memory fallback
   // In production: use proper credentials from environment variables
   if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
-    const privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n");
+    let privateKey = process.env.FIREBASE_PRIVATE_KEY.trim();
+    if (
+      (privateKey.startsWith('"') && privateKey.endsWith('"')) ||
+      (privateKey.startsWith("'") && privateKey.endsWith("'"))
+    ) {
+      privateKey = privateKey.slice(1, -1);
+    }
+    privateKey = privateKey.replace(/\\n/g, "\n");
+
+    try {
+      createPrivateKey(privateKey);
+    } catch (error) {
+      throw new Error(
+        "FIREBASE_PRIVATE_KEY is not a valid PEM private key. Copy the complete private_key value from your Firebase service-account JSON.",
+        { cause: error },
+      );
+    }
     
     return admin.initializeApp({
       credential: admin.credential.cert({
