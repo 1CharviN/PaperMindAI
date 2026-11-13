@@ -37,10 +37,42 @@ export default function DocumentView() {
 
   const analyzeMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest("POST", "/api/analyze", {
-        documentId: id,
-        operations: ["summary", "citations", "paraphrase", "plagiarism"],
+      const availableOperations = [
+        "summary",
+        "citations",
+        "paraphrase",
+        "plagiarism",
+      ] as const;
+      const operations = availableOperations.filter((operation) => {
+        switch (operation) {
+          case "summary":
+            return !document?.analysis?.summary;
+          case "citations":
+            return !document?.analysis?.citations;
+          case "paraphrase":
+            return !document?.analysis?.paraphrase;
+          case "plagiarism":
+            return document?.analysis?.plagiarismScore === undefined;
+        }
       });
+      const failures: string[] = [];
+
+      for (const operation of operations) {
+        try {
+          await apiRequest("POST", "/api/analyze", {
+            documentId: id,
+            operations: [operation],
+          });
+        } catch (error) {
+          failures.push(
+            `${operation}: ${error instanceof Error ? error.message : t("failedToAnalyzeDocument")}`,
+          );
+        }
+      }
+
+      if (failures.length > 0) {
+        throw new Error(failures.join("\n"));
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/documents", id] });

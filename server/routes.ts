@@ -185,6 +185,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           error: "Gemini is rate-limiting requests. Wait a moment, then retry the missing analysis.",
         });
       }
+      if (error?.name === "APIConnectionTimeoutError" || error?.code === "ETIMEDOUT") {
+        return res.status(504).json({
+          error: "Gemini took too long to respond. Completed results were saved; retry the missing analysis.",
+        });
+      }
       if (error?.status === 503 || (error?.status >= 500 && error?.status <= 599)) {
         return res.status(503).json({
           error: "Gemini is temporarily unavailable. Completed results were saved; please retry the analysis shortly.",

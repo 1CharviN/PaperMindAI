@@ -5,7 +5,8 @@ const geminiClient = process.env.GEMINI_API_KEY
   ? new OpenAI({
       apiKey: process.env.GEMINI_API_KEY,
       baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
-      maxRetries: 1,
+      maxRetries: 0,
+      timeout: 25_000,
     })
   : null;
 const geminiModel = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";

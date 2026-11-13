@@ -359,7 +359,8 @@ import { getAllAudioBase64 } from "google-tts-api";
 var geminiClient = process.env.GEMINI_API_KEY ? new OpenAI({
   apiKey: process.env.GEMINI_API_KEY,
   baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
-  maxRetries: 1
+  maxRetries: 0,
+  timeout: 25e3
 }) : null;
 var geminiModel = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";
 async function createChatCompletion(messages) {
@@ -580,6 +581,11 @@ async function registerRoutes(app3) {
       if (error?.status === 429) {
         return res.status(429).json({
           error: "Gemini is rate-limiting requests. Wait a moment, then retry the missing analysis."
+        });
+      }
+      if (error?.name === "APIConnectionTimeoutError" || error?.code === "ETIMEDOUT") {
+        return res.status(504).json({
+          error: "Gemini took too long to respond. Completed results were saved; retry the missing analysis."
         });
       }
       if (error?.status === 503 || error?.status >= 500 && error?.status <= 599) {
