@@ -113,12 +113,25 @@ import { nanoid } from "nanoid";
 
 // server/firebase.ts
 import admin from "firebase-admin";
+import { createPrivateKey } from "node:crypto";
 var initializeFirebase = () => {
   if (admin.apps.length > 0) {
     return admin.app();
   }
   if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
-    const privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n");
+    let privateKey = process.env.FIREBASE_PRIVATE_KEY.trim();
+    if (privateKey.startsWith('"') && privateKey.endsWith('"') || privateKey.startsWith("'") && privateKey.endsWith("'")) {
+      privateKey = privateKey.slice(1, -1);
+    }
+    privateKey = privateKey.replace(/\\n/g, "\n");
+    try {
+      createPrivateKey(privateKey);
+    } catch (error) {
+      throw new Error(
+        "FIREBASE_PRIVATE_KEY is not a valid PEM private key. Copy the complete private_key value from your Firebase service-account JSON.",
+        { cause: error }
+      );
+    }
     return admin.initializeApp({
       credential: admin.credential.cert({
         projectId: process.env.FIREBASE_PROJECT_ID,
