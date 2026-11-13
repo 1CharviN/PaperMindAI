@@ -4,6 +4,9 @@
   "functions": {
     "api/[...path].js": {
       "maxDuration": 60
+    },
+    "api/documents/[id].js": {
+      "maxDuration": 60
     }
   },
   "rewrites": [
